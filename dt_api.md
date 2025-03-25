@@ -1,3 +1,4 @@
+# server
 send_messages
 
     Parsing : Extraire et valider les adresses e-mail de l'expéditeur (sender_email) et du destinataire (receiver_email).
@@ -28,3 +29,26 @@ Add Contact
     Échange de Clés : Mettre en place un mécanisme pour échanger les clés publiques entre utilisateurs.
     Validation : Valider les informations récupérées et s'assurer que l'échange de clés est sécurisé.
     Gestion des Erreurs : Retourner des messages d'erreur appropriés en cas de problème lors de la récupération des informations ou de l'échange de clés.
+
+# CLient
+
+Pages
+
+    Connexion / inscruption
+    Home
+
+Scripts 
+
+    Connexion
+    Inscription
+    Double Ratchet Script
+    KDF script + random parameter generation
+    Shared secret script
+    RSA Script
+    Send Script
+    Recieve script
+    Add Contact
+    Long Polling
+    Search user
+    Load Message
+    Register message
