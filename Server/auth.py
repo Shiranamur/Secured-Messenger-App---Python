@@ -13,6 +13,7 @@ def register():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
+        identity_public_key = request.form['identity_public_key']
         salt = os.urandom(16)
         salt_hex = salt.hex()
         passwordHash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
@@ -29,8 +30,8 @@ def register():
                 return redirect(url_for('index'))
 
             cursor.execute(
-                'INSERT INTO users (email, pwdhash, salt) VALUES (%s, %s, %s)',
-                (email, passwordHash_hex, salt_hex)
+                'INSERT INTO users (email, pwdhash, salt, identity_public_key) VALUES (%s, %s, %s, %s)',
+                (email, passwordHash_hex, salt_hex, identity_public_key)
             )
             cnx.commit()
             flash('Register successful')

@@ -7,7 +7,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     pwdhash VARCHAR(255) NOT NULL,
     salt VARCHAR(255) NOT NULL,
-    global_public_key VARCHAR(255) NOT NULL,
+    identity_public_key VARCHAR(255) NOT NULL,
     PRIMARY KEY (id)
 );
 
