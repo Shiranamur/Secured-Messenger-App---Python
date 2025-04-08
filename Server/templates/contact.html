@@ -5,84 +5,116 @@
 </head>
 {% extends 'base.html' %}
 
+
 {% block content %}
-<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
-  Launch demo modal
+
+{% set is_contact = [] %}
+
+{% for conv in Conversions %}
+    {% if conv[0] == 1 and conv[2] is not none %}
+        {{ is_contact.append(conv[2]) }}
+    {% elif conv[2] == 1 and conv[0] is not none %}
+        {{ is_contact.append(conv[0]) }}
+    {% endif %}
+{% endfor %}
+
+
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addContactModal">
+  Ajouter un contact
 </button>
 
-<!-- Ajouter de nouveau contact !-->
-<!-- Il faut faire une condition quand il y aura le login le pas avoir la personne co et les gens qui sont déjà en contact -->
-<input type="text" id="myInput" onkeyup="myFunction()" placeholder="Search for names..">
-<table id="myTable">
 
-            <thead>
-                <tr class="header">
-                    <th>Username</th>
-                    <th>E-mail</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in Users %}
-                <tr>
-                    <td>{{user[0]}}</td>
-                    <td>{{user[1]}}</td>
-                    <td>
-                        <form action="{{ url_for('contact.add_contact') }}" method="post">
-                            <!-- l'id de la personne connectée -->
-                            <input type="hidden" name="user1" value="4">
-                            <input type="hidden" name="user2" value="{{user[0]}}">
-                            <input type="submit" value="Confirmer">
-                        </form>
-                    </td>
-                </tr>
+
+<div class="modal fade" id="addContactModal" tabindex="-1" role="dialog" aria-labelledby="addContactModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addContactModalLabel">Rechercher un nouvel utilisateur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Barre de recherche -->
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Rechercher un utilisateur..." class="form-control mb-3">
+
+        <!-- Tableau des utilisateurs caché dans le modal -->
+        <table id="userTable" class="table table-striped">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>E-mail</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in Users %}
+            <!-- Le 1 a remplacer par l'id de l'utilisateur connecter -->
+                {% if user[0] != 1 %}
+                    {% if user[0] not in is_contact %}
+                        <tr>
+                          <td>{{ user[0] }}</td>
+                          <td>{{ user[1] }}</td>
+                          <td>
+                            <form action="{{ url_for('contact.add_contact') }}" method="post">
+                              <input type="hidden" name="user1" value="1"> <!-- A remplacer plus tard par le vrai user connecté -->
+                              <input type="hidden" name="user2" value="{{ user[0] }}">
+                              <input type="submit" value="Ajouter" class="btn btn-success btn-sm">
+                            </form>
+                          </td>
+                        </tr>
+                    {% endif %}
+                {% endif %}
             {% endfor %}
-            </tbody>
+          </tbody>
+        </table>
 
+      </div>
 
-</table>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <h3> Liste des contacts</h3>
 <!-- Liste des contacts -->
-
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Username</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for user in Users %}
-            <!-- recuperer l'utilisateur qui est connecté remplacer à la place du 1 -->
-            {% if user[0] != 1 %}
-                <tr>
-                    <td>
-                        <form action="#" method="post">
-                            <input type="hidden" name="user1" value="4">
-                            <input type="hidden" name="user2" value="{{user[0]}}">
-                            <input type="submit" value="{{user[1]}}">
-                        </form>
-                    </td>
-                </tr>
-            {% endif %}
-            {% endfor %}
-            </tbody>
-        </table>
+<table>
+    <thead>
+        <tr>
+            <th>Username</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for user in Users %}
+        {% if user[0] in is_contact %}
+            <tr>
+                <td>
+                    <form action="#" method="post">
+                        <!-- remplacer par l'utilisateur co le -->
+                        <input type="hidden" name="user1" value="1">
+                        <input type="hidden" name="user2" value="{{user[0]}}">
+                        <input type="submit" value="{{ user[1] }}">
+                    </form>
+                </td>
+            </tr>
+        {% endif %}
+    {% endfor %}
+    </tbody>
+</table>
 
 
 <script>
-function myFunction() {
-  // Declare variables
+function filterTable() {
   var input, filter, table, tr, td, i, txtValue;
-  input = document.getElementById("myInput");
+  input = document.getElementById("searchInput");
   filter = input.value.toUpperCase();
-  table = document.getElementById("myTable");
+  table = document.getElementById("userTable");
   tr = table.getElementsByTagName("tr");
 
-  // Loop through all table rows, and hide those who don't match the search query
   for (i = 0; i < tr.length; i++) {
-    td = tr[i].getElementsByTagName("td")[1];
+    td = tr[i].getElementsByTagName("td")[0]; // on cherche sur Username
     if (td) {
       txtValue = td.textContent || td.innerText;
       if (txtValue.toUpperCase().indexOf(filter) > -1) {
