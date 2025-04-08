@@ -18,3 +18,11 @@ CREATE TABLE devices (
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE TABLE contacts(
+    user1_id INT,
+    user2_id INT,
+    PRIMARY KEY (user1_id, user2_id),
+    FOREIGN KEY (user1_id) REFERENCES users(id),
+    FOREIGN KEY (user2_id) REFERENCES users(id)
+)
