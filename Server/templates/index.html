@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Landing Page</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
 </head>
 <body>
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -30,7 +30,7 @@
                 <button id="login-btn" class="active">Login</button>
                 <button id="register-btn">Register</button>
             </div>
-            <form id="login-form" action="/login" method="POST">
+            <form id="login-form" class="active-form" action="/login" method="POST">
                 <h2>Login</h2>
                 <input type="email" name="email" placeholder="Email" required>
                 <input type="password" name="password" placeholder="Password" required>
@@ -45,7 +45,7 @@
             </form>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
     <script src="{{ url_for('static', filename='js/libsignal-protocol.js') }}"></script>
 </body>
 </html>
