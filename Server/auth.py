@@ -16,8 +16,8 @@ def register():
         identity_public_key = request.form['identity_public_key']
         salt = os.urandom(16)
         salt_hex = salt.hex()
-        passwordHash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
-        passwordHash_hex = passwordHash.hex()
+        password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+        password_hash_hex = password_hash.hex()
 
         cnx = get_db_cnx()
         cursor = cnx.cursor()
@@ -31,7 +31,7 @@ def register():
 
             cursor.execute(
                 'INSERT INTO users (email, pwdhash, salt, identity_public_key) VALUES (%s, %s, %s, %s)',
-                (email, passwordHash_hex, salt_hex, identity_public_key)
+                (email, password_hash_hex, salt_hex, identity_public_key)
             )
             cnx.commit()
             flash('Register successful')
@@ -55,8 +55,8 @@ def login():
                 stored_hash_hex = user[2]
                 stored_salt_hex = user[3]
                 salt = bytes.fromhex(stored_salt_hex)
-                passwordHash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
-                if passwordHash.hex() == stored_hash_hex:
+                password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+                if password_hash.hex() == stored_hash_hex:
                     flash('Login successful')
                     return redirect(url_for('index')) #change to /home quand la page est faite
                 else:
