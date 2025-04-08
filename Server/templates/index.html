@@ -7,6 +7,18 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
     <div class="container">
         <div class="text-section">
             <h1>Welcome to Our Messaging App</h1>
@@ -18,17 +30,16 @@
                 <button id="login-btn" class="active">Login</button>
                 <button id="register-btn">Register</button>
             </div>
-            <form id="login-form" class="active-form">
+            <form id="login-form" action="/login" method="POST">
                 <h2>Login</h2>
-                <input type="email" placeholder="Email" required>
-                <input type="password" placeholder="Password" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="password" placeholder="Password" required>
                 <button type="submit">Login</button>
             </form>
-            <form id="register-form">
+            <form id="register-form" action="/register" method="POST">
                 <h2>Register</h2>
-                <input type="text" placeholder="Username" required>
-                <input type="email" placeholder="Email" required>
-                <input type="password" placeholder="Password" required>
+                <input type="email" name="email" placeholder="email" required>
+                <input type="password" name="password" placeholder="password" required>
                 <button type="submit">Register</button>
             </form>
         </div>

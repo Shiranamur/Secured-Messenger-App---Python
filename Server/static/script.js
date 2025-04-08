@@ -11,12 +11,3 @@ document.getElementById('register-btn').addEventListener('click', function() {
     this.classList.add('active');
     document.getElementById('login-btn').classList.remove('active');
 });
-
-
-document.getElementById('login-form').addEventListener('submit', function(event){
-
-})
-
-document.getElementById('register-form').addEventListener('submit', function(event){
-
-})
