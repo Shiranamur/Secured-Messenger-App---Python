@@ -25,4 +25,4 @@ CREATE TABLE contacts(
     PRIMARY KEY (user1_id, user2_id),
     FOREIGN KEY (user1_id) REFERENCES users(id),
     FOREIGN KEY (user2_id) REFERENCES users(id)
-)
+);
