@@ -30,11 +30,11 @@ Add Contact
     Validation : Valider les informations récupérées et s'assurer que l'échange de clés est sécurisé.
     Gestion des Erreurs : Retourner des messages d'erreur appropriés en cas de problème lors de la récupération des informations ou de l'échange de clés.
 
-# CLient
+# Client
 
 Pages
 
-    Connexion / inscruption
+    Connexion / inscription
     Home
 
 Scripts 
