@@ -6,13 +6,5 @@ app = Flask(__name__)
 def home():
     return render_template('index.html')
 
-@app.route('/register')
-def register():
-    pass
-
-@app.route('/login')
-def login():
-    pass
-
 if __name__ == '__main__':
     app.run(debug=True)
