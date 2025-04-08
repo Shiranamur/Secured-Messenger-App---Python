@@ -1,6 +1,5 @@
 from urllib import request
-
-import MySQLdb
+import mysql.connector  # Use this instead of MySQLdb
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from database import get_db_cnx
 import os
@@ -26,7 +25,7 @@ def contact():
 
         for conversion in conversions:
             print("txt")
-    except MySQLdb.Error :
+    except mysql.connector.Error :
         pass
     finally:
         cursor.close()
@@ -45,7 +44,7 @@ def add_contact():
             cnx.commit()
             flash('Le contact a bien été ajouté')
             return redirect(url_for('contact.contact'))
-        except MySQLdb.Error:
+        except mysql.connector.Error:
             flash("Une erreur lors de l'ajout du contact")
             return redirect(url_for('contact.contact'))
         finally:
