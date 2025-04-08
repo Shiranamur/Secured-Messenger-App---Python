@@ -1,6 +1,6 @@
 from flask import Flask, render_template
 
-from auth import auth_bp
+from Server.auth import auth_bp
 from config.config import Config
 
 from contact import contact_bp
