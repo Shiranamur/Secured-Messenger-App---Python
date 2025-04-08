@@ -51,6 +51,7 @@ def login():
         try:
             cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
             user = cursor.fetchone()
+            print(f"user email: {user[1]}, user id: {user[0]}")
             if user:
                 stored_hash_hex = user[2]
                 stored_salt_hex = user[3]
@@ -58,7 +59,7 @@ def login():
                 password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
                 if password_hash.hex() == stored_hash_hex:
                     flash('Login successful')
-                    return redirect(url_for('index')) #change to /home quand la page est faite
+                    return redirect(url_for('home.dashboard', current_user_id=user[0], current_user_email=user[1])) # Assuming user[0] is the user ID and user[1] is the email
                 else:
                     flash('Invalid Credentials or user not found')
             else:
@@ -67,4 +68,4 @@ def login():
             cursor.close()
             cnx.close()
 
-    return render_template('auth/login.html')
+    return redirect(url_for("index"))

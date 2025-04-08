@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+<div class="dashboard-container">
+    <!-- Left panel: Conversations -->
+    <div class="conversations-panel">
+        <h2>Conversations</h2>
+        <div id="conversation-area">
+            <p class="empty-state">Select a contact to view conversation</p>
+        </div>
+        <div id="message-input" style="display: none;">
+            <input type="text" id="new-message" placeholder="Type a message...">
+            <button id="send-message">Send</button>
+        </div>
+    </div>
+
+    <!-- Right panel: Contacts -->
+    <div class="contacts-panel">
+        <h2>{{ current_user_email }}</h2>
+        <h2>Contacts</h2>
+        <ul class="contacts-list">
+            {% for contact in contacts %}
+            <li class="contact-item" data-contact-id="{{ contact[0] }}">
+                <span class="contact-name">{{ contact[1] }}</span>
+                <span class="contact-remove">Remove</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <br>
+
+        <h3>Add Contact</h3>
+        <form id="add-contact-form" action="{{ url_for('api.contact') }}" method="post">
+            <input type="hidden" name="user1" value="{{ current_user_id }}">
+            <label for="user2">Select User:</label>
+            <select id="user2" name="user2">
+                {% for user in users %}
+                <option value="{{ user[0] }}">{{ user[1] }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Add</button>
+        </form>
+    </div>
+</div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/Dashboard/style.css') }}">
+<script src="{{ url_for('static', filename='js/Dashboard/script.js') }}"></script>
+
+{% endblock %}
