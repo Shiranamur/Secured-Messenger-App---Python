@@ -1,13 +1,14 @@
+import hashlib
+import os
 from urllib import request
 
-from flask import Blueprint, rend_templates, rquest, redirect, url_for, flash
+from flask import Blueprint, render_template, redirect, url_for, flash
+
 from database import get_db_cnx
-import os
-import hashlib
 
 auth_bp = Blueprint('auth', __name__)
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         email = request.form['email']
@@ -59,4 +60,4 @@ def login():
             cursor.close()
             cnx.close()
 
-return rend_templates('auth/login.html')
+    return render_template('auth/login.html')

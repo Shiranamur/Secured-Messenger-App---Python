@@ -1,5 +1,5 @@
 import mysql.connector
-from config import DATABASE_CONFIG
+from config.config import DB_CONFIG
 
 def get_db_cnx():
-    return mysql.connector.connect(**DATABASE_CONFIG)
+    return mysql.connector.connect(**DB_CONFIG)

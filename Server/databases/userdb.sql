@@ -16,5 +16,5 @@ CREATE TABLE devices (
     user_id INT,
     new_global_public_key VARCHAR(255),
     PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES user(id)
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
