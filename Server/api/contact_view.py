@@ -44,8 +44,9 @@ class ContactView(MethodView):
 
     def delete(self):
         # Code for removing a contact
-        user1 = request.form['user1']
-        user2 = request.form['user2']
+        data = request.get_json()
+        user1 = data['user1']
+        user2 = data['user2']
         cnx = get_db_cnx()
         cursor = cnx.cursor(dictionary=True)
         try:
