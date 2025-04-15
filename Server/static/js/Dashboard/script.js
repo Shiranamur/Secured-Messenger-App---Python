@@ -46,16 +46,13 @@ document.querySelectorAll('.contact-remove').forEach(remove => {
         const currentUserId = document.querySelector('input[name="user1"]').value;
 
         // Send a request to remove the contact
+        const formData = new FormData();
+        formData.append('user1', currentUserId);
+        formData.append('user2', contactId);
+
         fetch(`/api/contact`, {
             method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            // You might need to include user ID in the body too
-            body: JSON.stringify({
-                user1: currentUserId,
-                user2: contactId
-            })
+            body: formData
         })
         .then(response => response.json())
         .then(data => {

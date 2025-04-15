@@ -40,7 +40,10 @@
                 <h2>Register</h2>
                 <input type="email" name="email" placeholder="email" required>
                 <input type="password" name="password" placeholder="password" required>
-                <input type="hidden" id="identity-public-key" name="identity_public_key" />
+                <input type="hidden" id="identity-public-key" name="identity_public_key">
+                <input type="hidden" id="signed-prekey" name="signed_prekey">
+                <input type="hidden" id="signed-prekey-signature" name="signed_prekey_signature">
+                <input type="hidden" id="prekeys" name="prekeys">
                 <button type="submit">Register</button>
             </form>
         </div>
