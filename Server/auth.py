@@ -16,7 +16,7 @@ def register():
     identity_public_key = request.form['identity_public_key']
     signed_prekey = request.form['signed_prekey']
     signed_prekey_signature = request.form['signed_prekey_signature']
-    prekeys_json = request.form['prekeys_json']
+    prekeys_json = request.form['prekeys']
 
     if not all([email, password, identity_public_key, signed_prekey, signed_prekey_signature, prekeys_json]):
         flash('All fields are required', 'error')

@@ -21,7 +21,8 @@ class ContactView(MethodView):
             if cursor.fetchone():
                 return jsonify({'status': 'error', 'message': 'Contact already exists'}), 409
 
-            cursor.execute("INSERT INTO contacts (user1_id, user2_id) VALUES (%s, %s)", (user1, user2))
+            cursor.execute("INSERT INTO contacts (user1_id, user2_id) VALUES (%s, %s), (%s, %s)",
+                           (user1, user2, user2, user1))
             cnx.commit()
 
             cursor.execute("SELECT * FROM contacts WHERE user1_id = %s AND user2_id = %s", (user1, user2))
@@ -44,9 +45,8 @@ class ContactView(MethodView):
 
     def delete(self):
         # Code for removing a contact
-        data = request.get_json()
-        user1 = data['user1']
-        user2 = data['user2']
+        user1 = request.form['user1']
+        user2 = request.form['user2']
         cnx = get_db_cnx()
         cursor = cnx.cursor(dictionary=True)
         try:

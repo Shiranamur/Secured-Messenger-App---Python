@@ -27,8 +27,8 @@
         <div class="separator"></div>
         <div class="form-section">
             <div class="form-toggle">
-                <button id="login-btn" class="active">Login</button>
-                <button id="register-btn">Register</button>
+                <button id="login-btn" class="active" type="button">Login</button>
+                <button id="register-btn" type="button">Register</button>
             </div>
             <form id="login-form" class="active-form" action="/login" method="POST">
                 <h2>Login</h2>
@@ -48,7 +48,7 @@
             </form>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
     <script src="{{ url_for('static', filename='js/libsignal-protocol.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>
