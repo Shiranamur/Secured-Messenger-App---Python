@@ -1,10 +1,13 @@
 # Python (Server/api/contact_view.py)
 from flask import request, jsonify
 from flask.views import MethodView
+from . import api_bp
 from ..database import get_db_cnx
 import mysql.connector
 
+
 class ContactView(MethodView):
+
     def post(self):
         # Code for adding a contact
         user1 = request.form['user1']
@@ -79,3 +82,7 @@ class ContactView(MethodView):
         finally:
             cursor.close()
             cnx.close()
+
+
+contact_view = ContactView.as_view('contact')
+api_bp.add_url_rule('/contact', view_func=contact_view, methods=['POST', 'DELETE'])
