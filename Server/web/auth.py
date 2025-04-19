@@ -89,7 +89,6 @@ def login():
     password = request.form['password']
     cnx = get_db_cnx()
     cursor = cnx.cursor()
-    user = None
 
     try:
         cursor.execute('SELECT id, email, pwdhash, salt FROM users WHERE email = %s', (email,))
@@ -115,6 +114,7 @@ def login():
 
     except Exception as e:
         #app.logger.exception("Login error")
+        print(e)
         flash('Internal error. Please try again.', 'error')
         return redirect(url_for('index'))
 

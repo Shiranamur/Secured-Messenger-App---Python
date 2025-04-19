@@ -18,7 +18,11 @@ class RegistrationForm(FlaskForm):
             raw = base64.b64decode(data)
         except Exception:
             raise ValidationError(f'{field_name} is not valid Base64')
-        if len(raw) != length:
+        if length == 32 and len(raw) == 33:
+            return
+        elif length == 32 and len(raw) != 33:
+            raise ValidationError(f'{field_name} must be 32 bytes + 1 format byte')
+        elif len(raw) != length:
             raise ValidationError(f'{field_name} must be {length} bytes')
 
     def validate_identity_public_key(self, field):
