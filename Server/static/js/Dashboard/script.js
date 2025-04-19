@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Functions for handling conversation display
-function loadConversation(contactId) {
-    fetch(`/api/conversations/${contactId}`)
+function loadConversation(contactEmail) {
+    fetch(`/api/conversations/${contactEmail}`)
         .then(response => response.json())
         .then(messages => {
             const conversationArea = document.getElementById('conversation-area');
@@ -41,18 +41,18 @@ function selectContact(contactElement) {
     document.getElementById('message-input').style.display = 'flex';
 
     // Load conversation for selected contact
-    const contactId = contactElement.dataset.contactId;
-    loadConversation(contactId);
+    const contactEmail = contactElement.dataset.contactEmail;
+    loadConversation(contactEmail);
 }
 
 function removeContact(contactElement, e) {
     e.stopPropagation(); // Prevent triggering the parent's click event
-    const contactId = contactElement.parentElement.dataset.contactId;
-    const currentUserId = document.querySelector('input[name="user1"]').value;
+    const contactEmail = contactElement.parentElement.dataset.contactEmail;
+    const currentUserEmail = document.querySelector('input[name="user1"]').value;
 
     const formData = new FormData();
-    formData.append('user1', currentUserId);
-    formData.append('user2', contactId);
+    formData.append('user1', currentUserEmail);
+    formData.append('user2', contactEmail);
 
     fetch(`/api/contact`, {
         method: 'DELETE',
@@ -71,11 +71,11 @@ function removeContact(contactElement, e) {
     });
 }
 
-function createContactElement(contactId, contactEmail) {
+function createContactElement(contactEmail) {
     // Create the contact HTML structure
     const newContact = document.createElement('li');
     newContact.className = 'contact-item';
-    newContact.dataset.contactId = contactId;
+    newContact.dataset.contactEmail = contactEmail;
 
     // Create the contact name span
     const nameSpan = document.createElement('span');
@@ -132,11 +132,10 @@ function initializeAddContactForm() {
                 console.log('Contact added successfully:', data);
 
                 // Get the contact details from the response
-                const contactId = data.contact.user2.id;
-                const contactEmail = data.contact.user2.email;
+                const contactEmail = data.userEmail;
 
                 // Create and append the new contact element
-                const newContact = createContactElement(contactId, contactEmail);
+                const newContact = createContactElement(contactEmail);
                 document.querySelector('.contacts-list').appendChild(newContact);
             } else {
                 console.error(data.message);

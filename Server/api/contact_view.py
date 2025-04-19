@@ -35,10 +35,7 @@ class ContactView(MethodView):
             return jsonify({
                 'status': 'success',
                 'message': 'Contact added successfully',
-                'contact': {
-                    'user1_id': user1,
-                    'user2': user_to_add
-                }
+                'userEmail': user_to_add.email,
             })
         except mysql.connector.Error as err:
             return jsonify({'status': 'error', 'message': f"Error adding contact: {err}"}), 500
@@ -72,10 +69,7 @@ class ContactView(MethodView):
             return jsonify({
                 'status': 'success',
                 'message': 'Contact removed successfully',
-                'contact': {
-                    'user1_id': user1,
-                    'user2': user_to_remove
-                }
+                'userEmail': user_to_remove.email,
             })
         except mysql.connector.Error as err:
             return jsonify({'status': 'error', 'message': f"Error removing contact: {err}"}), 500
