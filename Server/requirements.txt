@@ -1,2 +1,4 @@
 Flask
 mysql-connector-python
+flask_jwt_extended
+flask_wtf
