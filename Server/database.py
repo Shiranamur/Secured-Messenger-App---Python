@@ -29,3 +29,15 @@ def get_db_cnx():
     except mysql.connector.Error as err:
         print(f"Database connection error: {err}")
         raise
+
+def get_id_from_email(email):
+    """Get user ID from email."""
+    cnx = get_db_cnx()
+    cursor = cnx.cursor()
+    try:
+        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+    finally:
+        cursor.close()
+        cnx.close()

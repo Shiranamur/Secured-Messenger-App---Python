@@ -77,6 +77,5 @@ class ContactView(MethodView):
             cursor.close()
             cnx.close()
 
-
 contact_view = ContactView.as_view('contact')
 api_bp.add_url_rule('/contact', view_func=contact_view, methods=['POST', 'DELETE'])

@@ -32,21 +32,19 @@
         <ul class="contacts-list">
         </ul>
         <br>
-
         <h3>Add Contact</h3>
         <form id="add-contact-form" action="{{ url_for('api.contact') }}" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="user1" value="{{ current_user_id }}">
+            <input type="hidden" name="user1">
             <label for="user2">Select User:</label>
-            <select id="user2" name="user2">
-            </select>
+            <input type="text" id="user2" name="user2" placeholder="Enter email" required>
             <button type="submit">Add</button>
         </form>
     </div>
 </div>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/Dashboard/style.css') }}">
 <script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
-<script src="{{ url_for('static', filename='js/Dashboard/dashboard.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/Dashboard/dashboard.js') }}"></script>
 
 {% endblock %}
 
