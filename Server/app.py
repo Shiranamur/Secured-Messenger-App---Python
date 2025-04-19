@@ -4,14 +4,23 @@ from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
 from web import auth_bp, home_bp
 from api import api_bp
-from config.config import Config
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 csrf = CSRFProtect()
 jwt  = JWTManager()
 
 def create_app():
     app = Flask(__name__, template_folder='web/templates')
-    app.config.from_object(Config)
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+    app.config['JWT_TOKEN_LOCATION'] = os.getenv('JWT_TOKEN_LOCATION')
+    app.config['JWT_COOKIE_SECURE'] = os.getenv('JWT_COOKIE_SECURE')
+    app.config['JWT_COOKIE_HTTPONLY'] = os.getenv('JWT_COOKIE_HTTPONLY')
+    app.config['JWT_COOKIE_SAMESITE'] = os.getenv('JWT_COOKIE_SAMESITE')
+    app.config['JWT_ACCESS_CSRF_PROTECT'] = os.getenv('JWT_ACCESS_CSRF_PROTECT')
 
     csrf.init_app(app)
     jwt.init_app(app)
