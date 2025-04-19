@@ -1,87 +1,89 @@
 ﻿const KeyHelper = window.libsignal.KeyHelper;
 
-// Helper function for encoding ArrayBuffer to Base64 (from encoding)
-function arrayBufferToBase64(buffer) {
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
-}
-
-
-// Generate identity key pair and store it in local storage
-async function generateIdentityKeyPair() {
-    const identityKeyPair = await KeyHelper.generateIdentityKeyPair();
-    localStorage.setItem("identityKey.pub", arrayBufferToBase64(identityKeyPair.pubKey));
-    localStorage.setItem("identityKey.priv", arrayBufferToBase64(identityKeyPair.privKey));
-    return identityKeyPair;
-}
-
-// generate a X3DH (extended triple Diffie-Hellman) key echange
-// Generate prekeys and store them in localstorage
-async function generatePreKeys(identitykeyPair) {
-    // generate a signed prekey
-    const signedPreKey = await KeyHelper.generateSignedPreKey(
-        identitykeyPair,
-        0 // 0 is the key id
-    );
-
-    // Generate one-time prekeys
-    const preKeys = await Promise.all(
-        Array.from({length: 100}, (_, i) =>
-            KeyHelper.generatePreKey(i + 1)
-        )
-    );
-
-    // store locally
-    localStorage.setItem('signedPreKey', JSON.stringify({
-        keyId: signedPreKey.keyId,
-        keyPair: {
-            pubKey: arrayBufferToBase64(signedPreKey.keyPair.pubKey),
-            privKey: arrayBufferToBase64(signedPreKey.keyPair.privKey)
-        },
-        signature: arrayBufferToBase64(signedPreKey.signature)
-    }));
-
-    // store pre-keys
-    const serializedPreKeys = preKeys.map(pk => ({
-        keyId: pk.keyId,
-        keyPair: {
-            pubKey: arrayBufferToBase64(pk.keyPair.pubKey),
-            privKey: arrayBufferToBase64(pk.keyPair.privKey)
-        }
-    }))
-    localStorage.setItem('prekeys', JSON.stringify(serializedPreKeys));
-
-    return {signedPreKey, preKeys};
-}
-
-// helper function to create keys
-async function createKeys() {
-    try {
-        const identityKeyPair = await generateIdentityKeyPair();
-        const {signedPreKey, preKeys} = await generatePreKeys(identityKeyPair);
-
-        document.getElementById('identity-public-key').value =
-            arrayBufferToBase64(identityKeyPair.pubKey);
-
-        document.getElementById('signed-prekey').value =
-            arrayBufferToBase64(signedPreKey.keyPair.pubKey);
-
-        document.getElementById('signed-prekey-signature').value =
-            arrayBufferToBase64(signedPreKey.signature);
-
-        const preKeysData = preKeys.map(pk => ({
-            prekey_id: pk.keyId,
-            prekey: arrayBufferToBase64(pk.keyPair.pubKey)
-        }));
-        document.getElementById('prekeys').value = JSON.stringify(preKeysData);
-
-        return {
-            identityKeyPair,
-            signedPreKey,
-            preKeys
-        };
-    } catch (error) {
-        console.error('Error generating identity key pair:', error);
+    // Helper function for encoding ArrayBuffer to Base64
+    function arrayBufferToBase64(buffer) {
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
     }
-}
 
-export { createKeys }
+    // Generate identity key pair
+    async function generateIdentityKeyPair() {
+        try {
+            return await KeyHelper.generateIdentityKeyPair();
+        } catch (error) {
+            console.error('Failed to generate identity key pair:', error);
+            throw error;
+        }
+    }
+
+    // Generate prekeys for X3DH (extended triple Diffie-Hellman) key exchange
+    async function generatePreKeys(identityKeyPair) {
+        try {
+            // Generate a signed prekey
+            const signedPreKey = await KeyHelper.generateSignedPreKey(
+                identityKeyPair,
+                Date.now() & 0xffff
+            );
+
+            // Generate one-time prekeys
+            const preKeys = await Promise.all(
+                Array.from({length: 100}, (_, i) =>
+                    KeyHelper.generatePreKey(i + 1)
+                )
+            );
+
+            return {signedPreKey, preKeys};
+        } catch (error) {
+            console.error('Failed to generate prekeys:', error);
+            throw error;
+        }
+    }
+
+    // Helper function to create all required keys
+    async function createKeys() {
+        try {
+            console.log('Generating keys...');
+            const identityKeyPair = await generateIdentityKeyPair();
+            console.log('Identity key pair generated');
+
+            const {signedPreKey, preKeys} = await generatePreKeys(identityKeyPair);
+            console.log('Prekeys generated');
+
+            // Map prekeys to a format suitable for the server
+            const preKeysData = preKeys.map(pk => ({
+                prekey_id: pk.keyId,
+                prekey: arrayBufferToBase64(pk.keyPair.pubKey || pk.keyPair.publicKey)
+            }));
+
+            // Normalize property names to ensure consistency
+            const normalizedKeys = {
+                identityKeyPair: {
+                    pubKey: identityKeyPair.pubKey || identityKeyPair.publicKey,
+                    privKey: identityKeyPair.privKey || identityKeyPair.privateKey
+                },
+                signedPreKey: {
+                    keyId: signedPreKey.keyId,
+                    keyPair: {
+                        pubKey: signedPreKey.keyPair.pubKey || signedPreKey.keyPair.publicKey,
+                        privKey: signedPreKey.keyPair.privKey || signedPreKey.keyPair.privateKey
+                    },
+                    signature: signedPreKey.signature
+                },
+                preKeys: preKeys.map(pk => ({
+                    keyId: pk.keyId,
+                    prekey_id: pk.keyId, // Add for compatibility
+                    prekey: arrayBufferToBase64(pk.keyPair.pubKey || pk.keyPair.publicKey),
+                    keyPair: {
+                        pubKey: pk.keyPair.pubKey || pk.keyPair.publicKey,
+                        privKey: pk.keyPair.privKey || pk.keyPair.privateKey
+                    }
+                }))
+            };
+
+            return normalizedKeys;
+        } catch (error) {
+            console.error('Error in createKeys:', error);
+            throw error;
+        }
+    }
+
+    export { createKeys, arrayBufferToBase64 }
