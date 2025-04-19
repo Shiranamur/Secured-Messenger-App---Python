@@ -5,4 +5,4 @@ from flask import Blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # Import endpoint modules so their decorators run and register routes
-from . import contact_view, conversations
+from . import contact_view, crypto_view

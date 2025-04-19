@@ -34,18 +34,18 @@ CREATE TABLE prekeys (
     user_id INT NOT NULL,
     prekey_id INT NOT NULL,
     prekey VARCHAR(255) NOT NULL,
-    used BOOLEAN DEFAULT FALSE,
+    used BOOLEAN NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    sender_id INT NOT NULL,
-    receiver_id INT NOT NULL,
+    sender_email varchar(255) NOT NULL,
+    receiver_email varchar(255) NOT NULL,
     content TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_delivered BOOLEAN DEFAULT FALSE,
     is_read BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (sender_id) REFERENCES users(id),
-    FOREIGN KEY (receiver_id) REFERENCES users(id)
+    FOREIGN KEY (sender_email) REFERENCES users(email),
+    FOREIGN KEY (receiver_email) REFERENCES users(email)
 );

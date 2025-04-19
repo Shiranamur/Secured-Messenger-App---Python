@@ -31,7 +31,7 @@
         <h2>Contacts</h2>
         <ul class="contacts-list">
             {% for contact in contacts %}
-            <li class="contact-item" data-contact-id="{{ contact[0] }}">
+            <li class="contact-item" data-contact-email="{{ contact[1] }}" data-contact-id="{{ contact[0] }}">
                 <span class="contact-name">{{ contact[1] }}</span>
                 <span class="contact-remove">Remove</span>
             </li>
@@ -54,6 +54,8 @@
     </div>
 </div>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/Dashboard/style.css') }}">
+<script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
 <script src="{{ url_for('static', filename='js/Dashboard/script.js') }}"></script>
 
 {% endblock %}
+
