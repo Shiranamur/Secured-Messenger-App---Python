@@ -41,11 +41,11 @@ CREATE TABLE prekeys (
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT NOT NULL,
-    recipient_id INT NOT NULL,
-    ciphertext TEXT NOT NULL,
+    receiver_id INT NOT NULL,
+    content TEXT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_delivered BOOLEAN DEFAULT FALSE,
     is_read BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (sender_id) REFERENCES users(id),
-    FOREIGN KEY (recipient_id) REFERENCES users(id)
+    FOREIGN KEY (receiver_id) REFERENCES users(id)
 );
