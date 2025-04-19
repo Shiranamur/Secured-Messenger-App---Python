@@ -8,7 +8,7 @@ const conversationArea  = document.getElementById('conversation-area');
 const newMsgInput       = document.getElementById('new-message');
 const sendBtn           = document.getElementById('send-message');
 const messageInputBox   = document.getElementById('message-input');
-//const socket = io('/ws');
+const socket = io('/ws');
 
 // ─────────────────────────────────────────────
 // 1.  Page boot

@@ -7,7 +7,7 @@ socketio = SocketIO(cors_allowed_origins="*")   # init later
 def init_socketio(flask_app):
     socketio.init_app(flask_app)
 
-@socketio.on('connect')
+@socketio.on('ws')
 def on_connect():
     # The client sends its JWT in the 'Authorization' header: "Bearer <token>"
     verify_jwt_in_request()
