@@ -1,5 +1,31 @@
 import mysql.connector
-from config.config import Config
+import os
+from urllib.parse import urlparse
+
 
 def get_db_cnx():
-    return mysql.connector.connect(**Config.DB_CONFIG)
+    """Get a MySQL database connection using either a connection string or config dict."""
+    try:
+        # Try using connection string if provided in environment
+        conn_string = os.getenv('DB_CONNECTION_STRING')
+        if conn_string:
+            # Parse connection string to keyword arguments
+            result = urlparse(conn_string)
+            username = result.username
+            password = result.password
+            database = result.path.strip('/')
+            hostname = result.hostname
+            port = result.port or 3306
+
+            return mysql.connector.connect(
+                host=hostname,
+                user=username,
+                password=password,
+                database=database,
+                port=port
+            )
+        else:
+            raise Exception('No database connection string')
+    except mysql.connector.Error as err:
+        print(f"Database connection error: {err}")
+        raise
