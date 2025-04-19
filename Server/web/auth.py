@@ -1,3 +1,4 @@
+from Server.database import get_db_cnx
 import os
 import json
 import hashlib
@@ -10,9 +11,6 @@ from flask import (
 from .forms import RegistrationForm
 from datetime import timedelta
 from flask_jwt_extended import create_access_token, set_access_cookies
-
-
-from ..database import get_db_cnx
 
 
 auth_bp = Blueprint('auth', __name__)

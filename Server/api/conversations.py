@@ -1,6 +1,6 @@
 # Server/api/conversations.py
+from Server.database import get_db_cnx
 from flask import jsonify, request
-from ..database import get_db_cnx
 from . import api_bp
 
 ## filer for the moment

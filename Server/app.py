@@ -1,4 +1,5 @@
 from flask import Flask
+from flask import render_template
 from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
 from web import auth_bp, home_bp
@@ -17,6 +18,12 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(home_bp)
     app.register_blueprint(api_bp)
+
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+    return app
 
 if __name__ == '__main__':
     app = create_app()

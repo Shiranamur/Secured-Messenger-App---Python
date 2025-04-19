@@ -1,8 +1,8 @@
 # Python (Server/api/contact_view.py)
+from Server.database import get_db_cnx
 from flask import request, jsonify
 from flask.views import MethodView
 from . import api_bp
-from ..database import get_db_cnx
 import mysql.connector
 
 
