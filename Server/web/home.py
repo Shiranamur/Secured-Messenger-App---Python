@@ -36,10 +36,4 @@ def dashboard():
         cursor.close()
         cnx.close()
 
-    return render_template(
-        'dashboard.html',
-        users=users,
-        contacts=contacts,
-        current_user_id=current_user_id,
-        current_user_email=current_user_email
-    )
+    return render_template('dashboard.html')

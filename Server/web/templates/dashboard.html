@@ -30,12 +30,6 @@
         <h2>{{ current_user_email }}</h2>
         <h2>Contacts</h2>
         <ul class="contacts-list">
-            {% for contact in contacts %}
-            <li class="contact-item" data-contact-email="{{ contact[1] }}" data-contact-id="{{ contact[0] }}">
-                <span class="contact-name">{{ contact[1] }}</span>
-                <span class="contact-remove">Remove</span>
-            </li>
-            {% endfor %}
         </ul>
         <br>
 
@@ -45,9 +39,6 @@
             <input type="hidden" name="user1" value="{{ current_user_id }}">
             <label for="user2">Select User:</label>
             <select id="user2" name="user2">
-                {% for user in users %}
-                <option value="{{ user[0] }}">{{ user[1] }}</option>
-                {% endfor %}
             </select>
             <button type="submit">Add</button>
         </form>
@@ -55,7 +46,7 @@
 </div>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/Dashboard/style.css') }}">
 <script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
-<script src="{{ url_for('static', filename='js/Dashboard/script.js') }}"></script>
+<script src="{{ url_for('static', filename='js/Dashboard/dashboard.js') }}"></script>
 
 {% endblock %}
 

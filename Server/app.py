@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
 
 from Server.api.crypto_view import MessagesApi
+from Server.socket_manager import socketio, init_socketio
 from web import auth_bp, home_bp
 from api import api_bp
 import os
@@ -24,6 +25,7 @@ def create_app():
     app.config['JWT_COOKIE_SAMESITE'] = os.getenv('JWT_COOKIE_SAMESITE')
     app.config['JWT_ACCESS_CSRF_PROTECT'] = os.getenv('JWT_ACCESS_CSRF_PROTECT')
 
+    init_socketio(app)
     csrf.init_app(app)
     jwt.init_app(app)
     app.register_blueprint(auth_bp)
@@ -41,4 +43,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True)
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)

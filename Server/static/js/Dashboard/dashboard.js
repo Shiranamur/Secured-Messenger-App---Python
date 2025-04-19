@@ -4,20 +4,33 @@
 */
 
 let currentContactEmail = null;
-const conversationArea  = document.getElementById('conversation-area');
-const newMsgInput       = document.getElementById('new-message');
-const sendBtn           = document.getElementById('send-message');
-const messageInputBox   = document.getElementById('message-input');
-const socket = io('/ws');
+let currentUserEmail = null; // Add this to track the current user's email
+const conversationArea = document.getElementById('conversation-area');
+const newMsgInput = document.getElementById('new-message');
+const sendBtn = document.getElementById('send-message');
+const messageInputBox = document.getElementById('message-input');
+
+// Replace websocket connection with authenticated connection
+const socket = io('/', {
+    extraHeaders: {
+        'Authorization': `Bearer ${getCookie('access_token_cookie')}`
+    }
+});
 
 // ─────────────────────────────────────────────
 // 1.  Page boot
 // ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     console.debug('[BOOT] DOMContentLoaded');
-    initializeExistingContacts();
     initializeAddContactForm();
     setupSendMessage();
+    setupSocketHandlers();
+
+    // Get current user email from the contacts panel heading
+    currentUserEmail = document.querySelector('.contacts-panel h2').textContent.trim();
+
+    // Request contacts list via WebSocket
+    socket.emit('get_contacts');
 
     // status of the message‑input box at startup
     console.debug('[BOOT] #message-input display =', getComputedStyle(messageInputBox).display);
@@ -61,17 +74,69 @@ function appendMessage(blob, kind) {
 }
 
 // ─────────────────────────────────────────────
-// 3.  Real‑time socket handler
+// 3.  Real‑time socket handlers
 // ─────────────────────────────────────────────
-socket.on('connect', () => console.debug('[WS] Connected'));
-socket.on('message', msg => {
-    console.debug('[WS] Received message event', msg);
-    if (msg.from !== currentContactEmail) {
-        console.debug('[WS] Message is for another contact, ignoring');
-        return;
-    }
-    appendMessage(msg.ciphertext, 'incoming');
-});
+function setupSocketHandlers() {
+    socket.on('connect', () => console.debug('[WS] Connected'));
+
+    // Enhanced message handling
+    socket.on('message', (payload) => {
+        console.debug('[WS] Received message event', payload);
+        const { from, ciphertext, msg_type, id } = payload;
+
+        if (from !== currentContactEmail) {
+            console.debug('[WS] Message is for another contact, ignoring');
+            return;
+        }
+
+        appendMessage(ciphertext, 'incoming');
+    });
+
+    // Handle contacts list updates
+    socket.on('contacts_list', (data) => {
+        console.debug('[WS] Received contacts:', data);
+        updateContactsList(data.contacts);
+    });
+
+    // Handle sent message confirmations
+    socket.on('message_sent', (data) => {
+        console.debug('[WS] Message sent with ID:', data.id);
+    });
+
+    // Handle errors
+    socket.on('error', (error) => {
+        console.error('[WS] Socket error:', error);
+        alert(`Error: ${error.error}`);
+    });
+
+    socket.on('disconnect', () => {
+      console.debug('[WS] Disconnected');
+      // Show reconnection status in UI
+      const statusEl = document.createElement('div');
+      statusEl.className = 'connection-status disconnected';
+      statusEl.textContent = 'Connection lost. Reconnecting...';
+      document.body.appendChild(statusEl);
+    });
+
+    socket.on('reconnect', () => {
+      console.debug('[WS] Reconnected');
+      // Remove status message
+      document.querySelector('.connection-status')?.remove();
+    });
+}
+
+// Add updateContactsList function
+function updateContactsList(contacts) {
+    if (!contacts || !contacts.length) return;
+
+    console.debug('[CONTACT] Updating contacts list with', contacts.length, 'contacts');
+    const contactsList = document.querySelector('.contacts-list');
+
+    contacts.forEach(contact => {
+        const li = createContactElement(contact.email);
+        contactsList.appendChild(li);
+    });
+}
 
 // ─────────────────────────────────────────────
 // 4.  Contact management
@@ -117,7 +182,6 @@ function createContactElement(email) {
     console.debug('[CONTACT] Creating element for', email);
     const li   = document.createElement('li');
     li.className = 'contact-item';
-    li.dataset.contactEmail = email;
 
     const nameSpan   = document.createElement('span');
     nameSpan.className = 'contact-name';
@@ -126,7 +190,6 @@ function createContactElement(email) {
     const removeSpan = document.createElement('span');
     removeSpan.className = 'contact-remove';
     removeSpan.textContent = 'Remove';
-
     li.append(nameSpan, removeSpan);
 
     // click on name or empty space
@@ -135,16 +198,6 @@ function createContactElement(email) {
     removeSpan.addEventListener('click', e => removeContact(removeSpan, e));
 
     return li;
-}
-
-// initialise contacts present at page load
-function initializeExistingContacts() {
-    const rows = document.querySelectorAll('.contact-item');
-    console.debug('[BOOT] Found', rows.length, 'contacts in the list');
-    rows.forEach(li => li.addEventListener('click', () => selectContact(li)));
-
-    document.querySelectorAll('.contact-remove')
-            .forEach(span => span.addEventListener('click', e => removeContact(span, e)));
 }
 
 // Add‑contact form
@@ -177,41 +230,39 @@ function initializeAddContactForm() {
 // ─────────────────────────────────────────────
 function setupSendMessage() {
     console.debug('[BOOT] Wiring send button');
-    sendBtn.addEventListener('click', async () => {
-        if (!currentContactEmail) {
-            console.warn('[MSG] No contact selected');
-            return;
-        }
+    sendBtn.addEventListener('click', () => sendMessageViaSocket());
 
-        const plaintext = newMsgInput.value.trim();
-        if (!plaintext) {
-            console.warn('[MSG] Empty input, nothing sent');
-            return;
-        }
-
-        const blob = btoa(plaintext);      // TODO encrypt
-        console.debug('[MSG] Sending', plaintext.slice(0,50), '→', currentContactEmail);
-
-        try {
-            const r = await fetch('/api/messages', {
-                method : 'POST',
-                credentials : 'include',
-                headers: { 'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN' : getCookie('csrf_access_token')
-                },
-                body   : JSON.stringify({
-                    receiver   : currentContactEmail,
-                    ciphertext : blob,
-                    msg_type   : 'message'
-                })
-            });
-            console.debug('[MSG] POST /api/messages status', r.status);
-            appendMessage(blob, 'outgoing');
-            newMsgInput.value = '';
-        } catch (err) {
-            console.error('[MSG] Error sending message:', err);
-        }
+    // Add enter key support
+    newMsgInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessageViaSocket();
     });
+}
+
+function sendMessageViaSocket() {
+    if (!currentContactEmail) {
+        console.warn('[MSG] No contact selected');
+        return;
+    }
+
+    const plaintext = newMsgInput.value.trim();
+    if (!plaintext) {
+        console.warn('[MSG] Empty input, nothing sent');
+        return;
+    }
+
+    const blob = btoa(plaintext);      // TODO encrypt
+    console.debug('[MSG] Sending', plaintext.slice(0,50), '→', currentContactEmail);
+
+    // Use socket to send message
+    socket.emit('send_message', {
+        receiver: currentContactEmail,
+        ciphertext: blob,
+        msg_type: 'message'
+    });
+
+    // Add to conversation immediately (will be confirmed by message_sent event)
+    appendMessage(blob, 'outgoing');
+    newMsgInput.value = '';
 }
 
 function getCookie(cookieName) {
