@@ -39,7 +39,7 @@ def register():
     pepper = current_app.config.get('PASSWORD_PEPPER', '').encode()
     salt   = os.urandom(16)
     pwd    = password.encode() + pepper
-    hash_bytes = hashlib.pbkdf2_hmac('sha512', pwd, salt, 300_000)
+    hash_bytes = hashlib.pbkdf2_hmac('sha512', pwd, salt, 300000)
     pwdhash_hex = hash_bytes.hex()
     salt_hex    = salt.hex()
 
@@ -87,6 +87,7 @@ def register():
 def login():
     email = request.form['email']
     password = request.form['password']
+    pepper = current_app.config.get('PASSWORD_PEPPER', '').encode()
     cnx = get_db_cnx()
     cursor = cnx.cursor()
 
@@ -97,12 +98,13 @@ def login():
             user_id, user_email, stored_hash, stored_salt = row
             salt = bytes.fromhex(stored_salt)
             candidate = hashlib.pbkdf2_hmac(
-                'sha512', password.encode(), salt, 300000
+                'sha512', password.encode() + pepper, salt, 300000
             ).hex()
 
             if candidate == stored_hash:
                 access_token = create_access_token(
-                    identity={'id': user_id, 'email': user_email},
+                    identity = str(user_id),
+                    additional_claims = {'email': user_email},
                     expires_delta=timedelta(hours=1)
                 )
                 resp = redirect(url_for('home.dashboard'))

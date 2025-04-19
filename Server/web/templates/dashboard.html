@@ -41,7 +41,6 @@
 
         <h3>Add Contact</h3>
         <form id="add-contact-form" action="{{ url_for('api.contact') }}" method="post">
-            action="{{ url_for('api.contact') }}" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="user1" value="{{ current_user_id }}">
             <label for="user2">Select User:</label>
