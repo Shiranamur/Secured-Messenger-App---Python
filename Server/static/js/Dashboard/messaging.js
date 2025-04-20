@@ -1,7 +1,8 @@
 ﻿import { socket } from './socketHandlers.js';
 import { appendMessage } from './conversation.js';
+import { dbPromise } from './db.js';
 
-function sendMessageViaSocket() {
+async function sendMessageViaSocket() {
     if (!window.currentContactEmail) {
         console.warn('[MSG] No contact selected');
         return;
@@ -20,6 +21,25 @@ function sendMessageViaSocket() {
         msg_type: 'message'
     });
     appendMessage(blob, 'outgoing');
+    
+
+    try {
+      const db = await dbPromise;
+      const tx = db.transaction('messages', 'readwrite');
+      tx.objectStore('messages').add({
+        serverMessageId: null,
+        contactEmail: window.currentContactEmail,
+        ciphertext: blob,
+        direction: 'outgoing',
+        timestamp: Date.now(),
+        readFlag: false
+      });
+      await tx.complete;
+    } catch (e) {
+      console.error('[DB] Failed to save outgoing message', e);
+    }
+
+    
     newMsgInput.value = '';
 }
 

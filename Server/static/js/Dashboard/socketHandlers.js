@@ -1,6 +1,7 @@
 ﻿import { updateContactsList } from './contacts.js';
 import { appendMessage } from './conversation.js';
 import { getCookie } from './utils.js';
+import { dbPromise } from './db.js';
 
 const socket = io('/', {
   extraHeaders: {
@@ -11,15 +12,31 @@ const socket = io('/', {
 function setupSocketHandlers() {
   socket.on('connect', () => console.debug('[WS] Connected'));
 
-  socket.on('message', (payload) => {
+  socket.on('message', async (payload) => {
     console.debug('[WS] Received message event', payload);
-    const { from, ciphertext } = payload;
+    const {from, ciphertext, id} = payload;
     // Assume window.currentContactEmail is set when a contact is selected.
     if (from !== window.currentContactEmail) {
       console.debug('[WS] Message is for another contact, ignoring');
       return;
     }
     appendMessage(ciphertext, 'incoming');
+
+    try {
+      const db = await dbPromise;
+      const tx = db.transaction('messages', 'readwrite');
+      tx.objectStore('messages').add({
+        serverMessageId: id,
+        contactEmail: from,
+        ciphertext,
+        direction: 'incoming',
+        timestamp: Date.now(),
+        readFlag: false
+      });
+      await tx.complete;
+    } catch (e) {
+      console.error('[DB] Failed to save incoming message', e);
+    }
   });
 
   socket.on('contacts_list', (data) => {
@@ -27,9 +44,38 @@ function setupSocketHandlers() {
     updateContactsList(data.contacts);
   });
 
-  socket.on('message_sent', (data) => {
-    console.debug('[WS] Message sent with ID:', data.id);
+  socket.on('message_sent', async ({ id }) => {
+    console.debug('[WS] Message sent with ID:', id);
+
+    try {
+      const db = await dbPromise;
+      const tx = db.transaction('messages', 'readwrite');
+      const store = tx.objectStore('messages');
+      const idx = store.index('byContact');
+      const range = IDBKeyRange.only(window.currentContactEmail);
+
+      const recs = await new Promise((resolve, reject) => {
+        const req = idx.getAll(range);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+      });
+
+      const pending = recs.find(m =>
+        m.direction === 'outgoing' && m.serverMessageId == null
+      );
+
+      if (pending) {
+        pending.serverMessageId = id;
+        store.put(pending);
+      }
+
+      await new Promise(resolve => { tx.oncomplete = resolve });
+
+    } catch (e) {
+      console.error('[DB] Failed to update serverMessageId', e);
+    }
   });
+}
 
   socket.on('error', (error) => {
     console.error('[WS] Socket error:', error);
@@ -48,6 +94,5 @@ function setupSocketHandlers() {
     console.debug('[WS] Reconnected');
     document.querySelector('.connection-status')?.remove();
   });
-}
 
 export { socket, setupSocketHandlers };
