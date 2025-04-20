@@ -1,4 +1,4 @@
-import { initializeAddContactForm } from './contacts.js';
+import { initializeAddContactForm, fetchContacts } from './contacts.js';
 import { setupSendMessage } from './messaging.js';
 import { setupSocketHandlers, socket } from './socketHandlers.js';
 
@@ -6,6 +6,7 @@ let currentUserEmail = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     console.debug('[BOOT] DOMContentLoaded');
+    fetchContacts();
     initializeAddContactForm();
     setupSendMessage();
     setupSocketHandlers();

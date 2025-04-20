@@ -1,5 +1,6 @@
 ﻿// import { loadConversation } from './conversation.js';
 import { getCookie } from './utils.js';
+import { setupCryptoForContact } from './DoubleRatchet/contactCrypto.js';
 
 function createContactElement(email) {
     console.debug('[CONTACT] Creating element for', email);
@@ -64,7 +65,6 @@ function removeContact(removeSpan, e) {
         .catch(err => console.error('[CONTACT] Remove error:', err));
 }
 
-// TODO : add input validation for email querry add contact form
 function initializeAddContactForm() {
     console.debug('[BOOT] Wiring add-contact form');
     const form = document.getElementById('add-contact-form');
@@ -79,7 +79,6 @@ function initializeAddContactForm() {
         const formData = new FormData();
         formData.append('user2', emailInput.value);
 
-
         try {
             const response = await fetch('/api/contact', {
                 method: 'POST',
@@ -92,8 +91,20 @@ function initializeAddContactForm() {
             console.debug('[CONTACT] POST response:', js);
 
             if (js.status === 'success') {
+                // Add contact to UI
                 const li = createContactElement(emailInput.value);
                 document.querySelector('.contacts-list').appendChild(li);
+
+                // Setup cryptographic session with the new contact
+                try {
+                    await setupCryptoForContact(emailInput.value);
+                    console.debug('[CONTACT] Crypto setup complete for', emailInput.value);
+                } catch (cryptoErr) {
+                    console.error('[CONTACT] Failed to setup crypto:', cryptoErr);
+                    // You might want to show an error or warning to the user
+                    // TODO: pretify this error
+                }
+
                 emailInput.value = '';
             } else {
                 console.error('[CONTACT] Error:', js.message);
@@ -104,6 +115,25 @@ function initializeAddContactForm() {
     });
 }
 
+// Function to fetch contacts from server
+async function fetchContacts() {
+  try {
+    const response = await fetch('/api/contact', {
+      method: 'GET',
+      credentials: 'include',
+      headers: {'X-CSRF-TOKEN': getCookie('csrf_access_token')}
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      updateContactsList(data.contacts);
+    } else {
+      console.error('[CONTACT] Error fetching contacts:', data.message);
+    }
+  } catch (err) {
+    console.error('[CONTACT] Fetch contacts error:', err);
+  }
+}
+
 function updateContactsList(contacts) {
     const contactsList = document.querySelector('.contacts-list');
     contacts.forEach(contact => {
@@ -112,4 +142,4 @@ function updateContactsList(contacts) {
     });
 }
 
-export { createContactElement, selectContact, removeContact, initializeAddContactForm, updateContactsList};
+export { createContactElement, selectContact, removeContact, initializeAddContactForm, updateContactsList, fetchContacts};

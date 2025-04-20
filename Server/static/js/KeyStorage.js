@@ -110,15 +110,6 @@ async function persistKeyMaterial(keyMaterial) {
   }
 }
 
-export {
-  arrayBufferToBase64,
-  base64ToArrayBuffer,
-  persistKeyMaterial,
-  loadKeyMaterial,
-  getItem,
-  setItem
-};
-
 // Retrieve all stored key material
 async function loadKeyMaterial() {
   try {
@@ -144,3 +135,12 @@ async function loadKeyMaterial() {
     return null;
   }
 }
+
+export {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  persistKeyMaterial,
+  loadKeyMaterial,
+  getItem,
+  setItem
+};

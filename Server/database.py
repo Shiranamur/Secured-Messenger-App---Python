@@ -41,3 +41,15 @@ def get_id_from_email(email):
     finally:
         cursor.close()
         cnx.close()
+
+def get_email_from_id(user_id):
+    """Get user email from ID."""
+    cnx = get_db_cnx()
+    cursor = cnx.cursor()
+    try:
+        cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+    finally:
+        cursor.close()
+        cnx.close()

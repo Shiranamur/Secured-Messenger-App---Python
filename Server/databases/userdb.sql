@@ -49,3 +49,13 @@ CREATE TABLE messages (
     FOREIGN KEY (sender_email) REFERENCES users(email),
     FOREIGN KEY (receiver_email) REFERENCES users(email)
 );
+
+CREATE TABLE x3dh_params (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_email VARCHAR(255) NOT NULL,
+    recipient_email VARCHAR(255) NOT NULL,
+    ephemeral_key VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sender_email) REFERENCES users(email),
+    FOREIGN KEY (recipient_email) REFERENCES users(email)
+);

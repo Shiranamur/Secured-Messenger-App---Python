@@ -1,6 +1,7 @@
 ﻿import { updateContactsList } from './contacts.js';
 import { appendMessage } from './conversation.js';
 import { getCookie } from './utils.js';
+import { handleIncomingContact } from './DoubleRatchet/incomingContact.js';
 import { dbPromise } from './db.js';
 
 const socket = io('/', {
@@ -75,7 +76,6 @@ function setupSocketHandlers() {
       console.error('[DB] Failed to update serverMessageId', e);
     }
   });
-}
 
   socket.on('error', (error) => {
     console.error('[WS] Socket error:', error);
@@ -94,5 +94,20 @@ function setupSocketHandlers() {
     console.debug('[WS] Reconnected');
     document.querySelector('.connection-status')?.remove();
   });
+
+  socket.on('x3dh_params_ready', async (data) => {
+    console.debug('[WS] X3DH parameters ready from:', data.from);
+    try {
+      // Initialize crypto as a responder
+      await handleIncomingContact(data.from);
+      console.debug('[WS] Crypto session established for new contact');
+
+      // Update contact list to reflect the new secure connection
+      updateContactsList();
+    } catch (error) {
+      console.error('[WS] Failed to setup crypto for new contact:', error);
+    }
+  });
+}
 
 export { socket, setupSocketHandlers };

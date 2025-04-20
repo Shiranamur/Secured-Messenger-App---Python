@@ -1,16 +1,34 @@
-﻿from flask_jwt_extended import verify_jwt_in_request, get_jwt
+﻿from flask import request
+from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
 from flask_socketio import join_room, emit
 from Server.database import get_db_cnx
+
+
+user_sessions = {} # Dictionary to store user sessions
 
 def register_handlers(socketio):
     @socketio.on('connect')
     def handle_connect():
         verify_jwt_in_request()
-        jwt_data = get_jwt()
-        user_email = jwt_data["email"]
-        join_room(user_email)
-        print(f"User {user_email} connected")
+        user_id = get_jwt_identity()
+        user_sessions[user_id] = request.sid
+        join_room(user_id)
+        print(f"User {user_id} connected with socket ID {request.sid}")
 
+
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        # Remove user from tracking
+        for user_id, sid in list(user_sessions.items()):
+            if sid == request.sid:
+                del user_sessions[user_id]
+                break
+
+
+    def get_user_socket_id(user_id):
+        return user_sessions.get(user_id)
+
+    
     @socketio.on('send_message')
     def handle_send_message(data):
         verify_jwt_in_request()
@@ -49,30 +67,6 @@ def register_handlers(socketio):
             if cnx: cnx.rollback()
             print(e)
             emit('error', {"error": "Failed to send message"})
-        finally:
-            if cur: cur.close()
-            if cnx: cnx.close()
-
-    @socketio.on('get_contacts')
-    def handle_get_contacts():
-        verify_jwt_in_request()
-        jwt_data = get_jwt()
-        user_email = jwt_data["email"]
-
-        cnx, cur = None, None
-        try:
-            cnx = get_db_cnx()
-            cur = cnx.cursor(dictionary=True)
-            cur.execute("""
-                SELECT c.user2_id as id, u.email
-                FROM contacts c
-                JOIN users u ON c.user2_id = u.id
-                WHERE c.user1_id = (SELECT id FROM users WHERE email = %s)
-            """, (user_email,))
-            contacts_data = cur.fetchall()
-            emit('contacts_list', {"contacts": contacts_data})
-        except Exception as e:
-            emit('error', {"error": f"Failed to retrieve contacts: {str(e)}"})
         finally:
             if cur: cur.close()
             if cnx: cnx.close()
