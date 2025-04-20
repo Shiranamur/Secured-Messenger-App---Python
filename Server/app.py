@@ -3,7 +3,6 @@ from flask import render_template
 from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
 
-from Server.api.crypto_view import MessagesApi
 from Server.socket_manager import socketio, init_socketio
 from web import auth_bp, home_bp
 from api import api_bp
@@ -33,7 +32,6 @@ def create_app():
     app.register_blueprint(api_bp)
 
     csrf.exempt(api_bp)
-    csrf.exempt(MessagesApi)
 
     @app.route('/')
     def index():

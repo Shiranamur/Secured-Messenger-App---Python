@@ -33,11 +33,10 @@
         </ul>
         <br>
         <h3>Add Contact</h3>
-        <form id="add-contact-form" action="{{ url_for('api.contact') }}" method="post">
+        <form id="add-contact-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="user1">
-            <label for="user2">Select User:</label>
-            <input type="text" id="user2" name="user2" placeholder="Enter email" required>
+            <label for="add-contact-email">Email:</label>
+            <input type="email" id="add-contact-email" placeholder="Enter email" required>
             <button type="submit">Add</button>
         </form>
     </div>

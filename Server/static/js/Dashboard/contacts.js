@@ -1,4 +1,5 @@
-﻿import { loadConversation } from './conversation.js';
+﻿// import { loadConversation } from './conversation.js';
+import { getCookie } from './utils.js';
 
 function createContactElement(email) {
     console.debug('[CONTACT] Creating element for', email);
@@ -35,22 +36,25 @@ function selectContact(contactLi) {
     console.debug('[UI] #message-input display =', getComputedStyle(messageInputBox).display);
 
     window.currentContactEmail = contactLi.dataset.contactEmail;
-    loadConversation(window.currentContactEmail);
+    //loadConversation(window.currentContactEmail);
+    // TODO: Load conversation from IndexedDB
 }
 
 function removeContact(removeSpan, e) {
     e.stopPropagation();
     const li = removeSpan.parentElement;
-    const email2 = li.dataset.contactEmail;
-    const email1 = document.querySelector("input[name='user1']").value;
+    const emailToRemove = li.dataset.contactEmail;
 
-    console.debug('[CONTACT] Removing', email2);
+    console.debug('[CONTACT] Removing', emailToRemove);
+    let formData = new FormData();
+    formData.append('emailToRemove', emailToRemove);
 
-    const fd = new FormData();
-    fd.append('user1', email1);
-    fd.append('user2', email2);
-
-    fetch('/api/contact', { method: 'DELETE', body: fd })
+    fetch('/api/contact', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'X-CSRF-TOKEN' : getCookie('csrf_access_token'),},
+        body: formData
+    })
         .then(r => r.json())
         .then(js => {
             console.debug('[CONTACT] DELETE /api/contact →', js);
@@ -63,23 +67,39 @@ function removeContact(removeSpan, e) {
 // TODO : add input validation for email querry add contact form
 function initializeAddContactForm() {
     console.debug('[BOOT] Wiring add-contact form');
-    document.getElementById('add-contact-form').addEventListener('submit', async function (e) {
+    const form = document.getElementById('add-contact-form');
+
+    form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        const fd = new FormData(this);
-        console.debug('[CONTACT] Submitting add-contact request');
+        console.debug('[CONTACT] Form submitted, default prevented');
+
+        const emailInput = document.getElementById('add-contact-email');
+        console.debug('[CONTACT] Email input value:', emailInput.value);
+
+        const formData = new FormData();
+        formData.append('user2', emailInput.value);
+
+
         try {
-            const r = await fetch(this.action, { method: 'POST', body: fd });
-            console.debug('[CONTACT] POST /api/contact status', r.status);
-            const js = await r.json();
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {'X-CSRF-TOKEN': getCookie('csrf_access_token')},
+                body: formData
+            });
+
+            const js = await response.json();
+            console.debug('[CONTACT] POST response:', js);
+
             if (js.status === 'success') {
-                console.debug('[CONTACT] Added OK, email =', js.userEmail);
-                const li = createContactElement(js.userEmail);
+                const li = createContactElement(emailInput.value);
                 document.querySelector('.contacts-list').appendChild(li);
+                emailInput.value = '';
             } else {
-                console.error(js.message);
+                console.error('[CONTACT] Error:', js.message);
             }
         } catch (err) {
-            console.error('[CONTACT] Error adding contact:', err);
+            console.error('[CONTACT] Fetch error:', err);
         }
     });
 }
