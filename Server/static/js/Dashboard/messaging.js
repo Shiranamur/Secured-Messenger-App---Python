@@ -13,11 +13,11 @@ async function sendMessageViaSocket() {
         console.warn('[MSG] Empty input, nothing sent');
         return;
     }
-    const blob = btoa(plaintext); // TODO: encrypt if needed
+    // const blob = btoa(plaintext); // TODO: encrypt if needed
     console.debug('[MSG] Sending', plaintext.slice(0, 50), '→', window.currentContactEmail);
     socket.emit('send_message', {
         receiver: window.currentContactEmail,
-        ciphertext: blob,
+        ciphertext: plaintext,
         msg_type: 'message'
     });
     appendMessage(blob, 'outgoing');
