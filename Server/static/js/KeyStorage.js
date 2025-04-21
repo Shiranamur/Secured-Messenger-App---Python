@@ -204,6 +204,18 @@ async function getPreKey(preKeyId) {
   return loadKeyPair(`oneTimePreKey_${preKeyId}`);
 }
 
+async function deletePreKey(preKeyId) {
+  const db = await openDB();
+  const tx = db.transaction('keys', 'readwrite');
+  const store = tx.objectStore('keys');
+  const keyName = `oneTimePreKey_${preKeyId}`;
+  store.delete(keyName);
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+  });
+}
+
 export {
   arrayBufferToBase64,
   base64ToArrayBuffer,
@@ -212,5 +224,6 @@ export {
   getItem,
   setItem,
   storePreKey,
-  getPreKey
+  getPreKey,
+  deletePreKey
 };

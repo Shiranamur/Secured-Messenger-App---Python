@@ -21,6 +21,9 @@ async function setupCryptoForContact(contactEmail) {
     // 1. Fetch the contact's prekey bundle
     const prekeyBundle = await fetchPrekeyBundle(contactEmail);
 
+    const theirOneTimePreKeyId = prekeyBundle.one_time_prekey?.prekey_id ?? null;
+    console.log(theirOneTimePreKeyId)
+
     // 2. Load our identity key
     const ourKeyMaterial = await loadKeyMaterial();
     if (!ourKeyMaterial) {
@@ -34,7 +37,7 @@ async function setupCryptoForContact(contactEmail) {
     const sharedSecret = await performX3DH(ourKeyMaterial, prekeyBundle, ourEphemeralKeyPair);
 
     // 5. Send the ephemeral public key to the contact
-    await sendEphemeralKey(contactEmail, ourEphemeralKeyPair.pubKey);
+    await sendEphemeralKey(contactEmail, ourEphemeralKeyPair.pubKey, theirOneTimePreKeyId);
 
     // 6. Initialize a Double Ratchet session
     const session = new Session(contactEmail);
@@ -81,7 +84,7 @@ async function fetchPrekeyBundle(contactEmail) {
  * @param {string} contactEmail - Email of the contact
  * @param {ArrayBuffer} ephemeralKey - The ephemeral public key
  */
-async function sendEphemeralKey(contactEmail, ephemeralKey) {
+async function sendEphemeralKey(contactEmail, ephemeralKey, preKeyId) {
   const ephemeralKeyBase64 = arrayBufferToBase64(ephemeralKey);
   const response = await fetch('/api/x3dh_params', {
     method: 'POST',
@@ -92,7 +95,8 @@ async function sendEphemeralKey(contactEmail, ephemeralKey) {
     },
     body: JSON.stringify({
       recipient_email: contactEmail,
-      ephemeral_key: ephemeralKeyBase64
+      ephemeral_key: ephemeralKeyBase64,
+      prekey_id : preKeyId
     })
   });
 
@@ -109,14 +113,17 @@ async function sendEphemeralKey(contactEmail, ephemeralKey) {
  * @param {Object} theirPrekeyBundle - Contact's prekey bundle
  * @param {Object} ourEphemeralKeyPair - Our ephemeral key pair
  * @returns {Promise<ArrayBuffer>} - Derived shared secret
+ *
+ * note : pourquoi avoir nommer le bundle : theirPrekeyBundle à la place de bundle ?
  */
 async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPair) {
   try {
     // Convert base64 encoded keys to ArrayBuffers
     const theirIdentityKey = base64ToArrayBuffer(theirPrekeyBundle.identity_public_key);
     const theirSignedPreKey = base64ToArrayBuffer(theirPrekeyBundle.signed_prekey);
-    const theirOneTimePreKey = theirPrekeyBundle.one_time_prekey?.prekey ?
-        base64ToArrayBuffer(theirPrekeyBundle.one_time_prekey.prekey) : null;
+    const theirOneTimePreKey = theirPrekeyBundle.one_time_prekey?.prekey
+        ? base64ToArrayBuffer(theirPrekeyBundle.one_time_prekey.prekey) : null
+
 
     console.log('DH inputs:', {
       theirIdentityKeyLength: theirIdentityKey.byteLength,

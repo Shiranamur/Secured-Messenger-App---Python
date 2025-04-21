@@ -62,6 +62,8 @@ class KeysApi(MethodView):
                 "one_time_prekey": one_time_prekey
             }
 
+            print(prekey_bundle)
+
             return jsonify(prekey_bundle), 200
         except Exception as e:
             print(f"Error retrieving keys: {e}")

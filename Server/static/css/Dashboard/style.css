@@ -20,11 +20,30 @@
     background-color: #e6f7ff;
 }
 #conversation-area {
-    height: 70%;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    padding: 10px;
-    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.message {
+    display: inline-block;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 4px 0;
+    max-width: 60%;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+.message.sent {
+    background-color: #dcf8c6;
+    margin-left: auto;
+    text-align: right;
+}
+
+.message.received {
+    background-color: #ffffff;
+    margin-right: auto;
+    text-align: left;
 }
 #message-input {
     display: flex;

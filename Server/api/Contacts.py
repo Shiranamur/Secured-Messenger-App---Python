@@ -1,6 +1,7 @@
 # Python (Server/api/contact_view.py)
 from flask_jwt_extended import jwt_required, get_jwt_identity
-
+from Server.socket_manager import socketio
+from Server.socket_events import user_sessions, get_user_socket_id
 from Server.database import get_db_cnx, get_email_from_id
 from flask import request, jsonify
 from flask.views import MethodView
@@ -39,9 +40,6 @@ class ContactView(MethodView):
             cnx.commit()
 
             # Notify recipient through socket
-            from Server.socket_manager import socketio
-            from Server.socket_events import user_sessions, get_user_socket_id
-
             recipient_socket_id = get_user_socket_id(user_to_add['id'])
             if recipient_socket_id:
                 sender_email = get_email_from_id(user1_id)

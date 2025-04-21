@@ -72,4 +72,4 @@ class RefreshPrekeys(MethodView):
 
 refresh_prekeys = RefreshPrekeys.as_view('refresh_prekeys_view')
 api_bp.add_url_rule('/prekeys/count', view_func=refresh_prekeys, methods=['GET'])
-api_bp.add_url_rule('/api/refreshpks', view_func=refresh_prekeys, methods=['POST'])
+api_bp.add_url_rule('/refreshpks', view_func=refresh_prekeys, methods=['POST'])

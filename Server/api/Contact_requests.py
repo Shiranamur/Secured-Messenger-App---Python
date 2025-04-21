@@ -2,6 +2,8 @@
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask import request, jsonify
 from Server.database import get_db_cnx, get_email_from_id
+from Server.socket_manager import socketio
+from Server.socket_events import get_user_socket_id
 from . import api_bp
 
 class ContactRequestsView(MethodView):
@@ -17,7 +19,7 @@ class ContactRequestsView(MethodView):
                 SELECT cr.id, u.email as requester_email, cr.created_at
                 FROM contact_requests cr
                 JOIN users u ON cr.requester_id = u.id
-                WHERE cr.recipient_id = %s AND cr.status = 'pending' OR cr.status = 'pending_delete'
+                WHERE cr.recipient_id = %s AND cr.status = 'pending'
                 """,
                 (user_id,)
             )
@@ -59,10 +61,6 @@ class ContactRequestsView(MethodView):
                 (status, request_id)
             )
             cnx.commit()
-
-            # Notify requester
-            from Server.socket_manager import socketio
-            from Server.socket_events import get_user_socket_id
 
             print('acton taken is ', action)
             print('status is ', status)

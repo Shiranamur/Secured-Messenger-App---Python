@@ -201,18 +201,6 @@ function setupContactEvents() {
       showNotification(`${data.from} rejected your contact request`);
     }
   });
-
-  socket.on('contact_removed', (data) => {
-    console.debug('[WS] Contact removed:', data.from);
-    // TODO add remove contact logic from indexedDB
-    showNotification(`Contact ${data.from} has been removed.`);
-  });
-
-  socket.on('setup_crypto', (data) => {
-    console.debug('[WS] Setting up crypto with:', data.with);
-    setupCryptoForContact(data.with)
-      .catch(err => console.error('[WS] Failed to setup crypto:', err));
-  });
 }
 
 export { socket, setupSocketHandlers };

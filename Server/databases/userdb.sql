@@ -25,15 +25,6 @@ CREATE TABLE contact_requests
     UNIQUE KEY unique_request (requester_id, recipient_id)
 );
 
-
-CREATE TABLE devices (
-    id INT AUTO_INCREMENT,
-    user_id INT,
-    new_global_public_key VARCHAR(255),
-    PRIMARY KEY (id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
 CREATE TABLE prekeys (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -60,6 +51,7 @@ CREATE TABLE x3dh_params (
     sender_email VARCHAR(255) NOT NULL,
     recipient_email VARCHAR(255) NOT NULL,
     ephemeral_key VARCHAR(255) NOT NULL,
+    prekey_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_email) REFERENCES users(email),
     FOREIGN KEY (recipient_email) REFERENCES users(email)

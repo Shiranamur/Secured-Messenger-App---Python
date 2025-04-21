@@ -17,6 +17,7 @@ class X3DHParamsApi(MethodView):
         data = request.json
         recipient_email = data.get('recipient_email')
         ephemeral_key = data.get('ephemeral_key')
+        prekey_id = data.get('prekey_id')
 
         if not recipient_email or not ephemeral_key:
             return jsonify({"error": "Missing required parameters"}), 400
@@ -28,10 +29,10 @@ class X3DHParamsApi(MethodView):
             # Store the X3DH parameters in a new table
             cursor.execute(
                 """
-                INSERT INTO x3dh_params (sender_email, recipient_email, ephemeral_key)
-                VALUES (%s, %s, %s)
+                INSERT INTO x3dh_params (sender_email, recipient_email, ephemeral_key, prekey_id)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (sender_email, recipient_email, ephemeral_key)
+                (sender_email, recipient_email, ephemeral_key, prekey_id)
             )
             cnx.commit()
 
@@ -45,7 +46,8 @@ class X3DHParamsApi(MethodView):
 
 
     @jwt_required()
-    def get(self, sender_email=None):
+    def get(self, sender_email):
+        print('called x3dh get requests')
         if not sender_email:
             return jsonify({"error": "Sender email is required"}), 400
 
@@ -59,7 +61,7 @@ class X3DHParamsApi(MethodView):
         try:
             cursor.execute(
                 """
-                SELECT ephemeral_key FROM x3dh_params 
+                SELECT ephemeral_key, prekey_id FROM x3dh_params 
                 WHERE sender_email = %s AND recipient_email = %s
                 ORDER BY created_at DESC LIMIT 1
                 """,
@@ -72,7 +74,8 @@ class X3DHParamsApi(MethodView):
 
             return jsonify({
                 "status": "success",
-                "ephemeral_key": params["ephemeral_key"]
+                "ephemeral_key": params["ephemeral_key"],
+                "prekey_id": params["prekey_id"]
             }), 200
         except Exception as e:
             print(f"Error retrieving X3DH parameters: {e}")
