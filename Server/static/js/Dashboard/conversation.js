@@ -33,8 +33,8 @@ async function loadConversation(contactEmail) {
   }
 }
 
-function appendMessage(blob, kind) {
-    const plaintext = atob(blob); // TODO: decrypt if needed
+function appendMessage(plaintext, kind) {
+    //const plaintext = atob(blob); // TODO: decrypt if needed
     const el = document.createElement('div');
     el.className = `message ${kind}`;
     el.textContent = plaintext;

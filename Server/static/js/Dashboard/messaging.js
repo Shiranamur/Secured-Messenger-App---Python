@@ -13,14 +13,21 @@ async function sendMessageViaSocket() {
         console.warn('[MSG] Empty input, nothing sent');
         return;
     }
+
+    // Sanitize message before displaying
+    const tempDiv = document.createElement('div');
+    tempDiv.textContent = plaintext;
+    const sanitizedText = tempDiv.innerHTML; // or tempDiv.textContent
     // const blob = btoa(plaintext); // TODO: encrypt if needed
+
+
     console.debug('[MSG] Sending', plaintext.slice(0, 50), '→', window.currentContactEmail);
     socket.emit('send_message', {
         receiver: window.currentContactEmail,
         ciphertext: plaintext,
         msg_type: 'message'
     });
-    appendMessage(blob, 'outgoing');
+    appendMessage(sanitizedText, 'outgoing');
     
 
     try {
@@ -29,7 +36,7 @@ async function sendMessageViaSocket() {
       tx.objectStore('messages').add({
         serverMessageId: null,
         contactEmail: window.currentContactEmail,
-        ciphertext: blob,
+        ciphertext: plaintext,
         direction: 'outgoing',
         timestamp: Date.now(),
         readFlag: false

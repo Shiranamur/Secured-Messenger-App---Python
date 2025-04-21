@@ -1,7 +1,7 @@
 ﻿from flask import request
 from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
 from flask_socketio import join_room, emit
-from Server.database import get_db_cnx
+from Server.database import get_db_cnx, get_id_from_email
 
 
 user_sessions = {} # Dictionary to store user sessions
@@ -43,9 +43,10 @@ def register_handlers(socketio):
         verify_jwt_in_request()
         jwt_data = get_jwt()
         sender_email = jwt_data["email"]
+        print(f"Sender email: {sender_email} - {request.sid} - {data}")
 
         receiver_email = data.get("receiver")
-        blob = data.get("ciphertext")
+        text = data.get("ciphertext")
         msg_type = data.get("msg_type", "message")
 
         cnx = None
@@ -56,18 +57,18 @@ def register_handlers(socketio):
             cur.execute(
                 "INSERT INTO messages (sender_email, receiver_email, content)"
                 " VALUES (%s, %s, %s)",
-                (sender_email, receiver_email, blob)
+                (sender_email, receiver_email, text)
             )
             cnx.commit()
             message_id = cur.lastrowid
-
+            print(f"Message ID: {message_id} trying to send to : {receiver_email}")
             # Push to receiver if online
             socketio.emit('message', {
                 "from": sender_email,
-                "ciphertext": blob,
+                "ciphertext": text,
                 "msg_type": msg_type,
                 "id": message_id
-            }, room=receiver_email)
+            }, room=get_user_socket_id(get_id_from_email(receiver_email)))
 
             # Acknowledge successful send
             emit('message_sent', {"status": "sent", "id": message_id})
@@ -103,4 +104,30 @@ def register_handlers(socketio):
             emit('error', {"error": "Failed to fetch contacts"})
         finally:
             if cur: cur.close()
+            if cnx: cnx.close()
+
+    # socket_events.py - Add this new handler
+    @socketio.on('message_received')
+    def handle_message_received(data):
+        message_id = data.get("messageId")
+        sender_email = data.get("sender")
+
+        # Update message status in database
+        cnx = get_db_cnx()
+        try:
+            cur = cnx.cursor()
+            cur.execute(
+                "UPDATE messages SET is_delivered = TRUE WHERE id = %s",
+                (message_id,)
+            )
+            cnx.commit()
+
+            # Notify sender of delivery
+            socketio.emit('delivery_confirmation', {
+                "messageId": message_id,
+                "status": "delivered"
+            }, room=get_user_socket_id(get_id_from_email(sender_email)))
+        except Exception as e:
+            print(f"Error updating message status: {e}")
+        finally:
             if cnx: cnx.close()

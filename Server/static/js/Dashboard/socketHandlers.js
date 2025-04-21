@@ -47,6 +47,12 @@ function setupSocketHandlers() {
     } catch (e) {
       console.error('[DB] Failed to save incoming message', e);
     }
+
+    // Add delivery confirmation
+    socket.emit('message_received', {
+      messageId: id,
+      sender: from
+    });
   });
 
   socket.on('contacts_list_response', (data) => {
@@ -121,4 +127,17 @@ function setupSocketHandlers() {
   console.debug('[WS] Socket handlers have been set up successfully');
 }
 
-export { socket, setupSocketHandlers };
+// At the end of socketHandlers.js
+function testX3DHParamsReady(fromEmail = "test@example.com") {
+  const testEvent = {
+    from: fromEmail,
+    notification: `TEST: ${fromEmail} wants to establish secure communication`
+  };
+  console.debug('[WS] Testing x3dh_params_ready with data:', testEvent);
+
+  // Use the socket object directly from the module
+  socket.emit('test_x3dh_params', testEvent);
+}
+
+
+export { socket, setupSocketHandlers, testX3DHParamsReady };
