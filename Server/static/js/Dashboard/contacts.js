@@ -1,4 +1,4 @@
-﻿// import { loadConversation } from './conversation.js';
+﻿import { loadConversation } from './conversation.js';
 import { setupCryptoForContact } from './DoubleRatchet/contactCrypto.js';
 import { getCookie } from '../utils.js';
 
@@ -37,7 +37,7 @@ function selectContact(contactLi) {
     console.debug('[UI] #message-input display =', getComputedStyle(messageInputBox).display);
 
     window.currentContactEmail = contactLi.dataset.contactEmail;
-    //loadConversation(window.currentContactEmail);
+    loadConversation(window.currentContactEmail);
     // TODO: Load conversation from IndexedDB
 }
 
