@@ -4,7 +4,6 @@ import { appendMessage } from './conversation.js';
 import { showNotification } from '../notificationHandler.js';
 import { getCookie } from '../utils.js';
 import { dbPromise } from './db.js';
-import { setupCryptoForContact } from './DoubleRatchet/contactCrypto.js';
 import {handleContactResponse} from './ContactStorage.js';
 
 // Initialize socket connection with auth token

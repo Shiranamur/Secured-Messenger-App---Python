@@ -13,9 +13,9 @@ async function initializeDashboard() {
 
   try {
     // Set up UI components
+    setupSocketHandlers();
     initializeAddContactForm();
     setupSendMessage();
-    setupSocketHandlers();
 
     // Check for handled contact requests
     checkHandledRequests();

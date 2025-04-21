@@ -3,6 +3,9 @@ from flask_jwt_extended import jwt_required, get_jwt
 from flask import request, jsonify
 from Server.database import get_db_cnx, get_id_from_email
 from . import api_bp
+from Server.socket_manager import socketio
+from Server.socket_events import get_user_socket_id
+
 
 # Ephemeral key endpoints
 class EphemeralKeyApi(MethodView):
@@ -25,10 +28,24 @@ class EphemeralKeyApi(MethodView):
                 """
                 INSERT INTO x3dh_params (sender_email, recipient_email, ephemeral_key)
                 VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE 
+                    sender_email = %s,
+                    recipient_email = %s,
+                    ephemeral_key = %s
                 """,
-                (sender_email, recipient_email, ephemeral_key)
+                (sender_email, recipient_email, ephemeral_key, sender_email, recipient_email, ephemeral_key)
             )
             cnx.commit()
+
+            # Notify recipient through socket
+            recipient_id = get_id_from_email(recipient_email)
+            recipient_socket_id = get_user_socket_id(recipient_id)
+            if recipient_socket_id:
+                socketio.emit('ephemeral_key', {
+                    'from': sender_email,
+                    'ephemeral_key': ephemeral_key
+                }, room=recipient_socket_id)
+            print(f"Ephemeral key sent to {recipient_email} from {sender_email}")
             return jsonify({"status": "success"}), 200
         except Exception as e:
             print(f"Error storing ephemeral key: {e}")

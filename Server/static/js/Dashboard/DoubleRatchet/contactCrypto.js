@@ -46,23 +46,6 @@ async function setupCryptoForContact(contactEmail, communciationEndpoint) {
       session = new Session(contactEmail);
       await session.initializeAsInitiator(sharedSecret);
 
-    } else if (communciationEndpoint === 'receiving') {
-      // === RECIPIENT PATH ===
-
-      // 1. Fetch the ephemeral key sent by initiator
-      const ephemeralKey = await fetchEphemeralKey(contactEmail);
-
-      // 2. Perform X3DH as recipient using the ephemeral key
-      const sharedSecret = await performX3DHasRecipient(
-        ourKeyMaterial,
-        contactEmail,
-        base64ToArrayBuffer(ephemeralKey)
-      );
-
-      // 3. Initialize a Double Ratchet session as recipient
-      session = new Session(contactEmail);
-      await session.initializeAsInitiator(sharedSecret); // Using same method since only root key matters
-
     } else {
       throw new Error(`Invalid communication endpoint: ${communciationEndpoint}`);
     }
@@ -78,6 +61,7 @@ async function setupCryptoForContact(contactEmail, communciationEndpoint) {
     throw error;
   }
 }
+
 
 /**
  * Fetch the prekey bundle for a contact
@@ -197,8 +181,12 @@ async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPai
 
     console.log('DH inputs:', {
       theirIdentityKeyLength: theirIdentityKey.byteLength,
+      theirIdentityKey: theirIdentityKey,
       theirSignedPreKeyLength: theirSignedPreKey.byteLength,
-      ourKeyMaterial_identityKeyPair_privKey: ourKeyMaterial.identityKeyPair.privKey,
+        theirSignedPreKey: theirSignedPreKey,
+      ourKeyMaterial_identityKeyPair_privKey_length: ourKeyMaterial.identityKeyPair.privKey.byteLength,
+        ourKeyMaterial_signedPrekey_keyPair_privKey: ourKeyMaterial.signedPreKey.keyPair.privKey,
+        ourKeyMaterial_signedPrekey_keyPair_pubKey_length: ourKeyMaterial.signedPreKey.keyPair.pubKey.byteLength,
       ourEphemeralKeyPair_privKey: ourEphemeralKeyPair.privKey
     });
 
@@ -223,8 +211,11 @@ async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPai
 
     console.log('DH outputs:', {
       dh1Length: dh1.byteLength,
+        dh1: dh1,
       dh2Length: dh2.byteLength,
-      dh3Length: dh3.byteLength
+        dh2: dh2,
+      dh3Length: dh3.byteLength,
+        dh3: dh3
     });
 
     // // Calculate DH4 if one-time prekey is available
@@ -269,15 +260,19 @@ async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPai
  */
 async function performX3DHasRecipient(ourKeyMaterial, theirEmail, theirEphemeralKey) {
   try {
-
+    console.log('[CRYPTO] Performing X3DH as recipient for', theirEmail);
     // 1. Get their identity key
     const theirIdentityKey = await fetchIdentityKey(theirEmail);
 
     console.log('DH inputs:', {
-      ourKeyMaterial_signedPrekey_keyPair_privKey: ourKeyMaterial.signedPreKey.keyPair.privKey.byteLength,
-      ourKeyMaterial_identityKeyPair_privKey: ourKeyMaterial.identityKeyPair.privKey.byteLength,
+      ourKeyMaterial_signedPrekey_keyPair_privKey_length: ourKeyMaterial.signedPreKey.keyPair.privKey.byteLength,
+        ourKeyMaterial_signedPrekey_keyPair_privKey: ourKeyMaterial.signedPreKey.keyPair.privKey,
+      ourKeyMaterial_identityKeyPair_privKey_length: ourKeyMaterial.identityKeyPair.privKey.byteLength,
+      ourKeyMaterial_identityKeyPair_privKey: ourKeyMaterial.identityKeyPair.privKey,
       theirEphemeralKeyLength: theirEphemeralKey.byteLength,
+        theirEphemeralKey: theirEphemeralKey,
       theirIdentityKeyLength: theirIdentityKey.byteLength,
+        theirIdentityKey: theirIdentityKey
     });
 
 
@@ -308,8 +303,11 @@ async function performX3DHasRecipient(ourKeyMaterial, theirEmail, theirEphemeral
 
     console.log('DH outputs:', {
       dh1Length: dh1.byteLength,
+      dh1: dh1,
       dh2Length: dh2.byteLength,
-      dh3Length: dh3.byteLength
+        dh2: dh2,
+      dh3Length: dh3.byteLength,
+        dh3: dh3
     });
 
     // 4. Derive the shared secret using HKDF with IDENTICAL parameters
@@ -348,3 +346,30 @@ function concatenateArrayBuffers(...buffers) {
 }
 
 export { setupCryptoForContact };
+
+// After exporting everything, use dynamic import for socket
+// This ensures the module is fully loaded before accessing socket
+import('../socketHandlers.js').then(module => {
+  const socket = module.socket;
+
+  // Now set up the event handler
+  socket.on('ephemeral_key', async (payload) => {
+    // === RECIPIENT PATH ===
+    const ephemeralKey = payload.ephemeral_key;
+    const ourKeyMaterial = await loadKeyMaterial();
+
+    const sharedSecret = await performX3DHasRecipient(
+      ourKeyMaterial,
+      payload.from,
+      base64ToArrayBuffer(ephemeralKey)
+    );
+
+    const session = new Session(payload.from);
+    await session.initializeAsInitiator(sharedSecret);
+
+    await saveSession(session);
+
+  });
+}).catch(error => {
+  console.error('[CRYPTO] Error loading socket:', error);
+});

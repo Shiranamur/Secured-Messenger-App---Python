@@ -187,7 +187,6 @@ function handleRequestResponse(requestId, action, requesterEmail) {
         action === 'accept' ? 'accepted' :
         action === 'reject' ? 'rejected' : null
     if (responseAction) {
-      handleContactResponse(requesterEmail, responseAction, 'receiving');
       loadPendingRequests();
     } else {
       console.error('Unsupported action:', action);
