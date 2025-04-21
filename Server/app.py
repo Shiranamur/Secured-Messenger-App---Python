@@ -2,7 +2,6 @@ from flask import Flask
 from flask import render_template
 from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
-from Server.api.refreshPrekeys import prekeys_bp
 from Server.socket_manager import socketio, init_socketio
 from web import auth_bp, home_bp
 from api import api_bp
@@ -31,10 +30,8 @@ def create_app():
     app.register_blueprint(home_bp)
     app.register_blueprint(api_bp)
 
-    app.register_blueprint(prekeys_bp)
 
     csrf.exempt(api_bp)
-    csrf.exempt(prekeys_bp)
 
     @app.route('/')
     def index():

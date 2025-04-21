@@ -39,6 +39,11 @@
             <input type="email" id="add-contact-email" placeholder="Enter email" required>
             <button type="submit">Add</button>
         </form>
+
+        <div id="requests-section" style="display: none;">
+          <h3>Contact Requests</h3>
+          <div id="contact-requests"></div>
+        </div>
     </div>
 </div>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/Dashboard/style.css') }}">

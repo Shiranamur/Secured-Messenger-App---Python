@@ -13,20 +13,25 @@ CREATE TABLE users (
     PRIMARY KEY (id)
 );
 
+CREATE TABLE contact_requests
+(
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    requester_id INT NOT NULL,
+    recipient_id INT NOT NULL,
+    status       ENUM ('pending', 'accepted', 'rejected') DEFAULT 'pending',
+    created_at   TIMESTAMP                                DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (requester_id) REFERENCES users (id),
+    FOREIGN KEY (recipient_id) REFERENCES users (id),
+    UNIQUE KEY unique_request (requester_id, recipient_id)
+);
+
+
 CREATE TABLE devices (
     id INT AUTO_INCREMENT,
     user_id INT,
     new_global_public_key VARCHAR(255),
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE TABLE contacts(
-    user1_id INT,
-    user2_id INT,
-    PRIMARY KEY (user1_id, user2_id),
-    FOREIGN KEY (user1_id) REFERENCES users(id),
-    FOREIGN KEY (user2_id) REFERENCES users(id)
 );
 
 CREATE TABLE prekeys (

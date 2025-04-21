@@ -1,9 +1,16 @@
-﻿import { arrayBufferToBase64, base64ToArrayBuffer } from '../../KeyStorage.js';
+﻿// Server/static/js/Dashboard/DoubleRatchet/session.js
+import { arrayBufferToBase64, base64ToArrayBuffer } from '../../KeyStorage.js';
 
-
-// Session.js - Core Double Ratchet session management
+/**
+ * Session class for Double Ratchet protocol
+ */
 class Session {
-        constructor(contactEmail, sessionId) {
+    /**
+     * Create a new Double Ratchet session
+     * @param {string} contactEmail - Email of the contact
+     * @param {string} [sessionId] - Optional session ID (generated if not provided)
+     */
+    constructor(contactEmail, sessionId) {
         this.contactEmail = contactEmail;
         this.sessionId = sessionId || crypto.randomUUID();
 
@@ -24,8 +31,16 @@ class Session {
         this.initialized = false;
     }
 
-        // Initialize session with initial keys from X3DH
+    /**
+     * Initialize session as the initiator with shared secret from X3DH
+     * @param {ArrayBuffer} sharedSecret - Shared secret from X3DH
+     * @returns {Object} - Serialized session
+     */
     async initializeAsInitiator(sharedSecret) {
+        if (!sharedSecret) {
+            throw new Error('Shared secret is required');
+        }
+
         // Create initial ratchet key pair
         this.DHs = await window.libsignal.Curve.generateKeyPair();
         this.RK = sharedSecret;
@@ -34,7 +49,17 @@ class Session {
         return this.serialize();
     }
 
+    /**
+     * Initialize session as the responder with shared secret from X3DH
+     * @param {ArrayBuffer} sharedSecret - Shared secret from X3DH
+     * @param {ArrayBuffer} theirRatchetKey - Their initial ratchet key
+     * @returns {Object} - Serialized session
+     */
     async initializeAsResponder(sharedSecret, theirRatchetKey) {
+        if (!sharedSecret || !theirRatchetKey) {
+            throw new Error('Shared secret and ratchet key are required');
+        }
+
         // Set their initial ratchet key
         this.DHr = theirRatchetKey;
         this.RK = sharedSecret;
@@ -47,10 +72,16 @@ class Session {
         return this.serialize();
     }
 
-        // Implements the core Double Ratchet step
+    /**
+     * Performs a ratchet step (DH ratchet)
+     * @returns {Object} - Serialized session
+     */
     async ratchetStep() {
+        if (!this.DHr) {
+            throw new Error('Cannot perform ratchet step: No remote ratchet key');
+        }
+
         // DH Ratchet - create new ratchet key pair
-        const oldRatchetKey = this.DHs;
         this.DHs = await window.libsignal.Curve.generateKeyPair();
 
         // Calculate shared secret from DH exchange
@@ -77,7 +108,10 @@ class Session {
         return this.serialize();
     }
 
-    // Serialize session for storage
+    /**
+     * Serialize the session for storage
+     * @returns {Object} - Serialized session
+     */
     serialize() {
         return {
             contactEmail: this.contactEmail,

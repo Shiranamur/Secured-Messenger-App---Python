@@ -10,20 +10,10 @@ def register_handlers(socketio):
     @socketio.on('connect')
     def handle_connect():
         verify_jwt_in_request()
-        user_id = get_jwt_identity()
-        user_sessions[user_id] = request.sid
-        join_room(user_id)
-        print(f"User {user_id} connected with socket ID {request.sid}")
-
-    @socketio.on('identity_check')
-    def handle_identity_check():
-        try:
-            verify_jwt_in_request()
-            user_id = get_jwt_identity()
-            emit('identity_check_response', {'identity': user_id})
-        except Exception as e:
-            print(f"Error in identity check: {e}")
-            emit('error', {"error": "Identity verification failed"})
+        user_id_str = str(get_jwt_identity())
+        user_sessions[user_id_str] = request.sid
+        join_room(user_id_str)
+        print(f"User {user_id_str} connected with socket ID {request.sid}")
 
     @socketio.on('disconnect')
     def handle_disconnect():
@@ -33,11 +23,6 @@ def register_handlers(socketio):
                 del user_sessions[user_id]
                 break
 
-
-    def get_user_socket_id(user_id):
-        return user_sessions.get(user_id)
-
-    
     @socketio.on('send_message')
     def handle_send_message(data):
         verify_jwt_in_request()
@@ -81,30 +66,6 @@ def register_handlers(socketio):
             if cur: cur.close()
             if cnx: cnx.close()
 
-
-    @socketio.on('contacts_list')
-    def handle_contacts_list():
-        verify_jwt_in_request()
-        user_id = get_jwt_identity()
-        cnx = None
-        cur = None
-        try:
-            cnx = get_db_cnx()
-            cur = cnx.cursor(dictionary=True)
-            cur.execute(
-                "SELECT u.email FROM users u "
-                "JOIN contacts c ON (u.id = c.user2_id) "
-                "WHERE c.user1_id = %s",
-                (user_id,)
-            )
-            contacts = cur.fetchall()
-            emit('contacts_list_response', {"contacts": contacts})
-        except Exception as e:
-            print(e)
-            emit('error', {"error": "Failed to fetch contacts"})
-        finally:
-            if cur: cur.close()
-            if cnx: cnx.close()
 
     # socket_events.py - Add this new handler
     @socketio.on('message_received')
@@ -159,3 +120,10 @@ def register_handlers(socketio):
             emit('error', {"error": "Contact email is missing"})
             return
         mark_messages_as_read_in_db(user_email, contact_email)
+
+
+def get_user_socket_id(user_id):
+    return user_sessions.get(str(user_id))
+
+def is_user_online(user_id):
+    return user_id in user_sessions

@@ -1,28 +1,45 @@
-import { initializeAddContactForm} from './contacts.js';
+// Server/static/js/Dashboard/dashboard.js
+import { initializeAddContactForm, loadContacts, loadPendingRequests } from './contacts.js';
 import { setupSendMessage } from './messaging.js';
-import { setupSocketHandlers, socket } from './socketHandlers.js';
-import {refreshPreKeysIfNeeded} from "../X3DH.js";
+import { setupSocketHandlers } from './socketHandlers.js';
+import { refreshPreKeysIfNeeded } from "../X3DH.js";
+import { checkHandledRequests } from './ContactStorage.js';
 
-let currentUserEmail = null;
+/**
+ * Initialize the dashboard
+ */
+async function initializeDashboard() {
+  console.debug('[BOOT] Initializing dashboard');
 
-document.addEventListener('DOMContentLoaded', async () => {
-    console.debug('[BOOT] DOMContentLoaded');
+  try {
+    // Set up UI components
     initializeAddContactForm();
     setupSendMessage();
     setupSocketHandlers();
 
-    try {
-        await refreshPreKeysIfNeeded();
-    } catch (err) {
-        console.error('prekey refresh failed:', err);
-    }
+    // Check for handled contact requests
+    checkHandledRequests();
+
+    // Load user contacts
+    loadContacts();
+
+    // Load pending requests
+    loadPendingRequests();
+
+    // Ensure we have enough prekeys
+    await refreshPreKeysIfNeeded();
 
     // Get current user email from the contacts panel heading
-    currentUserEmail = document.querySelector('.contacts-panel h2').textContent.trim();
+    const currentUserEmail = document.querySelector('.contacts-panel h2').textContent.trim();
+    window.currentUserEmail = currentUserEmail;
 
-    // Request contacts list via WebSocket
-    socket.emit('contacts_list');
+    console.debug('[BOOT] Dashboard initialized successfully');
+  } catch (error) {
+    console.error('[BOOT] Dashboard initialization error:', error);
+  }
+}
 
-    const messageInputBox = document.getElementById('message-input');
-    console.debug('[BOOT] #message-input display =', getComputedStyle(messageInputBox).display);
-});
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', initializeDashboard);
+
+export { initializeDashboard };

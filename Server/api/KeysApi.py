@@ -8,8 +8,8 @@ from . import api_bp
 # 1.  /api/keys/<email>
 # ─────────────────────────────────────────────
 class KeysApi(MethodView):
-    decorators = [jwt_required()]
 
+    @jwt_required()
     def post(self):
         # Get the current user's email from the JWT
         jwt_data = get_jwt()
@@ -25,20 +25,6 @@ class KeysApi(MethodView):
         cnx = get_db_cnx()
         cursor = cnx.cursor(dictionary=True)
         try:
-            # First verify that these users are contacts
-            cursor.execute(
-                """
-                SELECT * FROM contacts
-                WHERE user1_id = (SELECT id FROM users WHERE email = %s)
-                AND user2_id = (SELECT id FROM users WHERE email = %s)
-                """,
-                (user_email, contact_email)
-            )
-            contact_relationship = cursor.fetchone()
-
-            if not contact_relationship:
-                return jsonify({"error": "Not authorized - contact relationship not found"}), 403
-
             # Get the contact's identity key and signed prekey
             cursor.execute(
                 "SELECT identity_public_key, signed_prekey, signed_prekey_signature FROM users WHERE email = %s",

@@ -1,63 +1,77 @@
-﻿import { socket } from './socketHandlers.js';
+﻿// Server/static/js/Dashboard/messaging.js
+import { socket } from './socketHandlers.js';
 import { appendMessage } from './conversation.js';
+import { saveMessage } from './db.js';
 import { dbPromise } from './db.js';
 
+/**
+ * Send a message via WebSocket
+ * @returns {Promise<void>}
+ */
 async function sendMessageViaSocket() {
-    if (!window.currentContactEmail) {
-        console.warn('[MSG] No contact selected');
-        return;
-    }
-    const newMsgInput = document.getElementById('new-message');
-    const plaintext = newMsgInput.value.trim();
-    if (!plaintext) {
-        console.warn('[MSG] Empty input, nothing sent');
-        return;
-    }
+  // Check if a contact is selected
+  if (!window.currentContactEmail) {
+    console.warn('[MSG] No contact selected');
+    return;
+  }
 
-    // Sanitize message before displaying
+  // Get message text
+  const newMsgInput = document.getElementById('new-message');
+  const plaintext = newMsgInput.value.trim();
+  if (!plaintext) {
+    console.warn('[MSG] Empty input, nothing sent');
+    return;
+  }
+
+  try {
+    // Sanitize message text
     const tempDiv = document.createElement('div');
     tempDiv.textContent = plaintext;
-    const sanitizedText = tempDiv.innerHTML; // or tempDiv.textContent
-    // const blob = btoa(plaintext); // TODO: encrypt if needed
+    const sanitizedText = tempDiv.textContent;
 
-
-    console.debug('[MSG] Sending', plaintext.slice(0, 50), '→', window.currentContactEmail);
+    // Send message via socket
+    console.debug('[MSG] Sending message to', window.currentContactEmail);
     socket.emit('send_message', {
-        receiver: window.currentContactEmail,
-        ciphertext: plaintext,
-        msg_type: 'message'
+      receiver: window.currentContactEmail,
+      ciphertext: sanitizedText,
+      msg_type: 'message'
     });
+
+    // Save message to local storage
+    await saveMessage({
+      contactEmail: window.currentContactEmail,
+      ciphertext: sanitizedText,
+      direction: 'outgoing',
+      timestamp: Date.now()
+    });
+
+    // Display message in conversation
     appendMessage(sanitizedText, 'outgoing');
-    
 
-    try {
-      const db = await dbPromise;
-      const tx = db.transaction('messages', 'readwrite');
-      tx.objectStore('messages').add({
-        serverMessageId: null,
-        contactEmail: window.currentContactEmail,
-        ciphertext: plaintext,
-        direction: 'outgoing',
-        timestamp: Date.now(),
-        readFlag: false
-      });
-      await tx.complete;
-    } catch (e) {
-      console.error('[DB] Failed to save outgoing message', e);
-    }
-
-    
+    // Clear input
     newMsgInput.value = '';
+
+  } catch (error) {
+    console.error('[MSG] Error sending message:', error);
+  }
 }
 
+/**
+ * Set up message sending functionality
+ */
 function setupSendMessage() {
-    console.debug('[BOOT] Wiring send button');
-    const sendBtn = document.getElementById('send-message');
-    sendBtn.addEventListener('click', () => sendMessageViaSocket());
-    const newMsgInput = document.getElementById('new-message');
-    newMsgInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessageViaSocket();
+  const sendButton = document.getElementById('send-message');
+  const msgInput = document.getElementById('new-message');
+
+  if (sendButton) {
+    sendButton.addEventListener('click', sendMessageViaSocket);
+  }
+
+  if (msgInput) {
+    msgInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessageViaSocket();
     });
+  }
 }
 
-export { sendMessageViaSocket, setupSendMessage };
+export { setupSendMessage, sendMessageViaSocket };

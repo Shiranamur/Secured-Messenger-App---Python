@@ -1,7 +1,7 @@
 # Python (Server/api/contact_view.py)
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from Server.database import get_db_cnx, get_id_from_email
+from Server.database import get_db_cnx, get_email_from_id
 from flask import request, jsonify
 from flask.views import MethodView
 from . import api_bp
@@ -12,75 +12,97 @@ class ContactView(MethodView):
 
     @jwt_required()
     def post(self):
-        # Code for adding a contact
         user1_id = get_jwt_identity()
         user2_email = request.form['user2']
 
         cnx = get_db_cnx()
         cursor = cnx.cursor(dictionary=True)
-        user2_id = get_id_from_email(user2_email)
         try:
-            cursor.execute("SELECT * FROM users WHERE id = %s", (user2_id,))
+            cursor.execute("SELECT * FROM users WHERE email = %s", (user2_email,))
             user_to_add = cursor.fetchone()
             if not user_to_add:
                 return jsonify({'status': 'error', 'message': 'User not found'}), 404
+            elif str(user_to_add['id']) == user1_id:
+                return jsonify({'status': 'error', 'message': 'Cannot add yourself'}), 409
 
-            cursor.execute("SELECT * FROM contacts WHERE user1_id = %s AND user2_id = %s", (user1_id, user2_id))
-            if cursor.fetchone():
-                return jsonify({'status': 'error', 'message': 'Contact already exists'}), 409
-
-            cursor.execute("INSERT INTO contacts (user1_id, user2_id) VALUES (%s, %s), (%s, %s)",
-                           (user1_id, user2_id, user2_id, user1_id))
+            # Create contact request instead of immediately adding
+            cursor.execute(
+                """
+                INSERT INTO contact_requests (requester_id, recipient_id)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE 
+                    status = 'pending',
+                    created_at = CURRENT_TIMESTAMP
+                """,
+                (user1_id, user_to_add['id'])
+            )
             cnx.commit()
 
-            cursor.execute("SELECT * FROM contacts WHERE user1_id = %s AND user2_id = %s", (user1_id, user2_id))
-            if not cursor.fetchone():
-                print('Failed to add contact')
-                return jsonify({'status': 'error', 'message': 'Failed to add contact'}), 500
+            # Notify recipient through socket
+            from Server.socket_manager import socketio
+            from Server.socket_events import user_sessions, get_user_socket_id
+
+            recipient_socket_id = get_user_socket_id(user_to_add['id'])
+            if recipient_socket_id:
+                sender_email = get_email_from_id(user1_id)
+                socketio.emit('contact_request', {
+                    'from': sender_email
+                }, room=recipient_socket_id)
 
             return jsonify({
                 'status': 'success',
-                'message': 'Contact added successfully',
+                'message': 'Contact request sent successfully',
                 'userEmail': user_to_add['email'],
             })
-        except mysql.connector.Error as err:
-            print('Failed to add contact ', err)
-            return jsonify({'status': 'error', 'message': f"Error adding contact: {err}"}), 500
+        except Exception as e:
+            print('Failed to send contact request', e)
+            return jsonify({'status': 'error', 'message': str(e)}), 500
         finally:
             cursor.close()
             cnx.close()
 
     @jwt_required()
     def delete(self):
-        # Code for removing a contact
         user1_id = get_jwt_identity()
         user2_email = request.form['emailToRemove']
-        user2_id = get_id_from_email(user2_email)
         cnx = get_db_cnx()
         cursor = cnx.cursor(dictionary=True)
+
         try:
-            cursor.execute("SELECT * FROM users WHERE id = %s", (user2_id,))
+            cursor.execute("SELECT * FROM users WHERE email = %s", (user2_email,))
             user_to_remove = cursor.fetchone()
             if not user_to_remove:
                 return jsonify({'status': 'error', 'message': 'User not found'}), 404
 
-            cursor.execute("SELECT * FROM contacts WHERE user1_id = %s AND user2_id = %s", (user1_id, user2_id))
-            if not cursor.fetchone():
-                return jsonify({'status': 'error', 'message': 'Contact does not exists'}), 409
-
-            cursor.execute("DELETE FROM contacts WHERE (user1_id = %s AND user2_id=%s)", (user1_id, user2_id))
-            cursor.execute("DELETE FROM contacts WHERE (user1_id = %s AND user2_id=%s)", (user2_id, user1_id))
+            # Mark contact as deleted. Here, we add a new entry with the status deleted 'deleted'.
+            # Insert with duplicate handling: update status to 'deleted' if the entry exists
+            cursor.execute(
+                """
+                INSERT INTO contact_requests (requester_id, recipient_id, status)
+                VALUES (%s, %s, 'deleted')
+                ON DUPLICATE KEY UPDATE status = 'deleted'
+                """,
+                (user1_id, user_to_remove['id'])
+            )
             cnx.commit()
 
-            cursor.execute("SELECT * FROM contacts WHERE user1_id = %s AND user2_id = %s", (user1_id, user2_id))
-            if cursor.fetchone():
-                return jsonify({'status': 'error', 'message': 'Failed to remove contact'}), 500
+            # Notify the other user via socket
+            from Server.socket_manager import socketio
+            from Server.socket_events import get_user_socket_id
+
+            recipient_socket_id = get_user_socket_id(user_to_remove['id'])
+            if recipient_socket_id:
+                sender_email = get_email_from_id(user1_id)
+                socketio.emit('contact_removed', {
+                    'from': sender_email
+                }, room=recipient_socket_id)
 
             return jsonify({
                 'status': 'success',
                 'message': 'Contact removed successfully',
                 'userEmail': user_to_remove['email'],
             })
+
         except mysql.connector.Error as err:
             return jsonify({'status': 'error', 'message': f"Error removing contact: {err}"}), 500
         finally:

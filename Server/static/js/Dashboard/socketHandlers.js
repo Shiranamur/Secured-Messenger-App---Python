@@ -1,130 +1,42 @@
-﻿import { updateContactsList } from './contacts.js';
+// Server/static/js/Dashboard/socketHandlers.js
+import { loadPendingRequests } from './contacts.js';
 import { appendMessage } from './conversation.js';
-import { handleIncomingContact } from './DoubleRatchet/incomingContact.js';
+import { showNotification } from '../notificationHandler.js';
 import { getCookie } from '../utils.js';
 import { dbPromise } from './db.js';
+import { setupCryptoForContact } from './DoubleRatchet/contactCrypto.js';
+import {handleContactResponse} from './ContactStorage.js';
 
+// Initialize socket connection with auth token
 const socket = io('/', {
   extraHeaders: {
     'Authorization': `Bearer ${getCookie('access_token_cookie')}`
   }
 });
 
+/**
+ * Setup all socket event handlers
+ */
 function setupSocketHandlers() {
+  // Connection events
+  setupConnectionEvents();
+
+  // Message events
+  setupMessageEvents();
+
+  // Contact events
+  setupContactEvents();
+
+  console.debug('[WS] Socket handlers have been set up successfully');
+}
+
+/**
+ * Setup connection-related socket events
+ */
+function setupConnectionEvents() {
   socket.on('connect', () => {
     console.debug('[WS] Connected with socket.id:', socket.id);
-    // Verify identity is set correctly
-    socket.emit('identity_check');
   });
-
-  // TODO debug only
-  socket.on('identity_check_response', (data) => {
-    console.debug('[WS] Server identifies me as:', data.identity);
-  });
-
-  socket.on('message', async (payload) => {
-    console.debug('[WS] Received message event', payload);
-    const {from, ciphertext, id} = payload;
-    // Assume window.currentContactEmail is set when a contact is selected.
-    if (from !== window.currentContactEmail) {
-      console.debug('[WS] Message is for another contact, ignoring');
-      return;
-    }
-    appendMessage(ciphertext, 'incoming');
-
-    try {
-      const db = await dbPromise;
-      const tx = db.transaction('messages', 'readwrite');
-      tx.objectStore('messages').add({
-        serverMessageId: id,
-        contactEmail: from,
-        ciphertext,
-        direction: 'incoming',
-        timestamp: Date.now(),
-        readFlag: false
-      });
-      await tx.complete;
-    } catch (e) {
-      console.error('[DB] Failed to save incoming message', e);
-    }
-
-    // Add delivery confirmation
-    socket.emit('message_received', {
-      messageId: id,
-      sender: from
-    });
-  });
-
-  socket.on('contacts_list_response', (data) => {
-    console.debug('[WS] Received contacts:', data);
-    updateContactsList(data.contacts);
-  });
-
-  socket.on('message_sent', async ({ id }) => {
-    console.debug('[WS] Message sent with ID:', id);
-
-    try {
-      const db = await dbPromise;
-      const tx = db.transaction('messages', 'readwrite');
-      const store = tx.objectStore('messages');
-      const idx = store.index('byContact');
-      const range = IDBKeyRange.only(window.currentContactEmail);
-
-      const recs = await new Promise((resolve, reject) => {
-        const req = idx.getAll(range);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror   = () => reject(req.error);
-      });
-
-      const pending = recs.find(m =>
-        m.direction === 'outgoing' && m.serverMessageId == null
-      );
-
-      if (pending) {
-        pending.serverMessageId = id;
-        store.put(pending);
-      }
-
-      await new Promise(resolve => { tx.oncomplete = resolve });
-
-    } catch (e) {
-      console.error('[DB] Failed to update serverMessageId', e);
-    }
-  });
-
-  socket.on('messages_load', async (data) => {
-  console.debug('[WS] Received undelivered messages:', data);
-  const messages = data.messages || [];
-
-  const contactEmail = window.currentContactEmail;
-  if (!contactEmail) return;
-
-  const db = await dbPromise;
-  const tx = db.transaction('messages', 'readwrite');
-  const store = tx.objectStore('messages');
-
-  for (const msg of messages) {
-    const { content, timestamp } = msg;
-
-    // Simule réception immédiate
-    appendMessage(content, 'incoming');
-
-    store.add({
-      serverMessageId: null,
-      contactEmail: contactEmail,
-      ciphertext: content,
-      direction: 'incoming',
-      timestamp: new Date(timestamp).getTime(),
-      readFlag: false
-    });
-  }
-
-  await tx.complete;
-});
-socket.on('mark_messages_as_read', ({ contact_email }) => {
-  console.debug(`[WS] Messages marked as read for ${contact_email}`);
-});
-
 
   socket.on('error', (error) => {
     console.error('[WS] Socket error:', error);
@@ -143,35 +55,164 @@ socket.on('mark_messages_as_read', ({ contact_email }) => {
     console.debug('[WS] Reconnected');
     document.querySelector('.connection-status')?.remove();
   });
+}
 
-  socket.on('x3dh_params_ready', async (data) => {
-    console.debug('[WS] X3DH parameters ready from:', data.from);
+/**
+ * Setup message-related socket events
+ */
+function setupMessageEvents() {
+  socket.on('message', async (payload) => {
+    console.debug('[WS] Received message event', payload);
+    const {from, ciphertext, id} = payload;
+
+    // Ignore messages not for current contact
+    if (from !== window.currentContactEmail) {
+      console.debug('[WS] Message is for another contact, ignoring');
+      return;
+    }
+
+    // Display message
+    appendMessage(ciphertext, 'incoming');
+
+    // Store message in IndexedDB
     try {
-      // Initialize crypto as a responder
-      await handleIncomingContact(data.from);
-      console.debug('[WS] Crypto session established for new contact');
+      const db = await dbPromise;
+      const tx = db.transaction('messages', 'readwrite');
+      tx.objectStore('messages').add({
+        serverMessageId: id,
+        contactEmail: from,
+        ciphertext,
+        direction: 'incoming',
+        timestamp: Date.now(),
+        readFlag: false
+      });
+      await tx.complete;
+    } catch (e) {
+      console.error('[DB] Failed to save incoming message', e);
+    }
 
-      // Update contact list to reflect the new secure connection
-      updateContactsList();
-    } catch (error) {
-      console.error('[WS] Failed to setup crypto for new contact:', error);
+    // Send delivery confirmation
+    socket.emit('message_received', {
+      messageId: id,
+      sender: from
+    });
+  });
+
+  socket.on('message_sent', async ({ id }) => {
+    console.debug('[WS] Message sent with ID:', id);
+
+    try {
+      await updateSentMessageWithId(id);
+    } catch (e) {
+      console.error('[DB] Failed to update serverMessageId', e);
     }
   });
 
-  console.debug('[WS] Socket handlers have been set up successfully');
+  socket.on('messages_load', async (data) => {
+      console.debug('[WS] Received undelivered messages:', data);
+      const messages = data.messages || [];
+
+      const contactEmail = window.currentContactEmail;
+      if (!contactEmail) return;
+
+      const db = await dbPromise;
+      const tx = db.transaction('messages', 'readwrite');
+      const store = tx.objectStore('messages');
+
+      for (const msg of messages) {
+        const { content, timestamp } = msg;
+
+        // Simule réception immédiate
+        appendMessage(content, 'incoming');
+
+        store.add({
+          serverMessageId: null,
+          contactEmail: contactEmail,
+          ciphertext: content,
+          direction: 'incoming',
+          timestamp: new Date(timestamp).getTime(),
+          readFlag: false
+        });
+      }
+
+      await tx.complete;
+    });
+
+    socket.on('mark_messages_as_read', ({ contact_email }) => {
+      console.debug(`[WS] Messages marked as read for ${contact_email}`);
+    });
+
 }
 
-// At the end of socketHandlers.js
-function testX3DHParamsReady(fromEmail = "test@example.com") {
-  const testEvent = {
-    from: fromEmail,
-    notification: `TEST: ${fromEmail} wants to establish secure communication`
-  };
-  console.debug('[WS] Testing x3dh_params_ready with data:', testEvent);
+/**
+ * Update sent message with server ID
+ * @param {string} id - Server message ID
+ * @returns {Promise<void>}
+ */
+async function updateSentMessageWithId(id) {
+  const db = await dbPromise;
+  const tx = db.transaction('messages', 'readwrite');
+  const store = tx.objectStore('messages');
+  const idx = store.index('byContact');
+  const range = IDBKeyRange.only(window.currentContactEmail);
 
-  // Use the socket object directly from the module
-  socket.emit('test_x3dh_params', testEvent);
+  const recs = await new Promise((resolve, reject) => {
+    const req = idx.getAll(range);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+  const pending = recs.find(m =>
+    m.direction === 'outgoing' && m.serverMessageId == null
+  );
+
+  if (pending) {
+    pending.serverMessageId = id;
+    store.put(pending);
+  }
+
+  return new Promise(resolve => { tx.oncomplete = resolve });
 }
 
+/**
+ * Setup contact-related socket events
+ */
+function setupContactEvents() {
+  socket.on('contact_request', (data) => {
+    console.debug('[WS] Received contact request from:', data.from);
+    loadPendingRequests();
+    showNotification(`New contact request from ${data.from}`);
+  });
 
-export { socket, setupSocketHandlers, testX3DHParamsReady };
+  socket.on('contact_request_response', (data) => {
+    console.debug('[WS] Contact request response:', data.from, "with status:", data.status);
+
+    try {
+      handleContactResponse(data.from, data.status)
+    }
+    catch (err) {
+      console.error('[WS] Failed to handle contact response:', err);
+    }
+
+    if (data.status === 'accepted') {
+      showNotification(`${data.from} accepted your contact request`);
+      // No notification needed, contact will be added to list
+    } else {
+      showNotification(`${data.from} rejected your contact request`);
+    }
+  });
+
+  socket.on('contact_removed', (data) => {
+    console.debug('[WS] Contact removed:', data.from);
+    // TODO add remove contact logic from indexedDB
+    showNotification(`Contact ${data.from} has been removed.`);
+  });
+
+  socket.on('setup_crypto', (data) => {
+    console.debug('[WS] Setting up crypto with:', data.with);
+    setupCryptoForContact(data.with)
+      .catch(err => console.error('[WS] Failed to setup crypto:', err));
+  });
+}
+
+export { socket, setupSocketHandlers };

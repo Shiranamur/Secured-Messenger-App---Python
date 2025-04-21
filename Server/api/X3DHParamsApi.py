@@ -6,8 +6,8 @@ from . import api_bp
 
 
 class X3DHParamsApi(MethodView):
-    decorators = [jwt_required()]
 
+    @jwt_required()
     def post(self):
         # Get the current user's email (Alice)
         jwt_data = get_jwt()
@@ -35,23 +35,6 @@ class X3DHParamsApi(MethodView):
             )
             cnx.commit()
 
-            # Notify Bob through socket
-            from Server.socket_manager import socketio
-            from Server.socket_events import user_sessions
-
-            # Before socket emit
-            recipient_id = get_id_from_email(recipient_email)
-            print(f"Trying to notify recipient_id: {recipient_id}, in user_sessions: {recipient_id in user_sessions}")
-            if recipient_id in user_sessions:
-                recipient_sid = user_sessions[recipient_id]
-                print(f"Emitting x3dh_params_ready to {recipient_email} (ID: {recipient_id}) with SID: {recipient_sid}")
-                socketio.emit('x3dh_params_ready', {
-                    'from': sender_email,
-                    'notification': f'{sender_email} wants to establish secure communication'
-                }, room=recipient_sid)  # Use the SID directly
-            else:
-                print(f"User {recipient_email} (ID: {recipient_id}) not online. Active sessions: {user_sessions}")
-
             return jsonify({"status": "success"}), 200
         except Exception as e:
             print(f"Error storing X3DH parameters: {e}")
@@ -60,6 +43,8 @@ class X3DHParamsApi(MethodView):
             if cursor: cursor.close()
             if cnx: cnx.close()
 
+
+    @jwt_required()
     def get(self, sender_email=None):
         if not sender_email:
             return jsonify({"error": "Sender email is required"}), 400
@@ -96,14 +81,7 @@ class X3DHParamsApi(MethodView):
             if cursor: cursor.close()
             if cnx: cnx.close()
 
-api_bp.add_url_rule(
-    '/x3dh_params',
-    view_func=X3DHParamsApi.as_view('x3dh_params'),
-    methods=['POST']
-)
 
-api_bp.add_url_rule(
-    '/x3dh_params/<sender_email>',
-    view_func=X3DHParamsApi.as_view('x3dh_params_get'),
-    methods=['GET']
-)
+x3dh_params_view = X3DHParamsApi.as_view('x3dh_params')
+api_bp.add_url_rule('/x3dh_params', view_func=x3dh_params_view, methods=['POST'])
+api_bp.add_url_rule('/x3dh_params/<contact_email>', view_func=x3dh_params_view, methods=['GET'])
