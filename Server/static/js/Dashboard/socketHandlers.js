@@ -92,6 +92,40 @@ function setupSocketHandlers() {
     }
   });
 
+  socket.on('messages_load', async (data) => {
+  console.debug('[WS] Received undelivered messages:', data);
+  const messages = data.messages || [];
+
+  const contactEmail = window.currentContactEmail;
+  if (!contactEmail) return;
+
+  const db = await dbPromise;
+  const tx = db.transaction('messages', 'readwrite');
+  const store = tx.objectStore('messages');
+
+  for (const msg of messages) {
+    const { content, timestamp } = msg;
+
+    // Simule réception immédiate
+    appendMessage(content, 'incoming');
+
+    store.add({
+      serverMessageId: null,
+      contactEmail: contactEmail,
+      ciphertext: content,
+      direction: 'incoming',
+      timestamp: new Date(timestamp).getTime(),
+      readFlag: false
+    });
+  }
+
+  await tx.complete;
+});
+socket.on('mark_messages_as_read', ({ contact_email }) => {
+  console.debug(`[WS] Messages marked as read for ${contact_email}`);
+});
+
+
   socket.on('error', (error) => {
     console.error('[WS] Socket error:', error);
     alert(`Error: ${error.error}`);

@@ -53,3 +53,54 @@ def get_email_from_id(user_id):
     finally:
         cursor.close()
         cnx.close()
+
+def messaging_waiting(user_email, contact_email):
+    try:
+        cnx = get_db_cnx()
+        cur = cnx.cursor(dictionary=True)
+
+        # Requête pour récupérer les messages non livrés pour ce contact
+        cur.execute("""
+            SELECT content, timestamp
+            FROM messages
+            WHERE sender_email = %s AND receiver_email = %s AND is_delivered = FALSE
+        """, (contact_email, user_email))
+
+        messages = cur.fetchall()
+
+        cur. execute(
+            """UPDATE messages
+                SET is_delivered = TRUE
+                WHERE sender_email = %s AND receiver_email = %s AND is_delivered = FALSE;
+                )"""
+        , (contact_email, user_email))
+        for message in messages:
+            message['timestamp'] = message['timestamp'].isoformat()
+
+        return messages
+
+    except Exception as e:
+        print(f"Error fetching undelivered messages: {e}")
+        return None
+    finally:
+        if cur:
+            cur.close()
+        if cnx:
+            cnx.close()
+
+def mark_messages_as_read_in_db(user_email, contact_email):
+    """Met à jour le statut 'is_read' des messages reçus."""
+    print("wtf")
+    cnx = get_db_cnx()
+    cursor = cnx.cursor()
+    try:
+        cursor.execute(
+            """UPDATE messages
+               SET is_read = TRUE
+               WHERE sender_email = %s AND receiver_email = %s""",
+            (contact_email, user_email)
+        )
+        cnx.commit()
+    finally:
+        cursor.close()
+        cnx.close()

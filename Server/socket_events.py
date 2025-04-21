@@ -1,7 +1,7 @@
 ﻿from flask import request
 from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
 from flask_socketio import join_room, emit
-from Server.database import get_db_cnx, get_id_from_email
+from Server.database import get_db_cnx, get_id_from_email, messaging_waiting, mark_messages_as_read_in_db
 
 
 user_sessions = {} # Dictionary to store user sessions
@@ -131,3 +131,31 @@ def register_handlers(socketio):
             print(f"Error updating message status: {e}")
         finally:
             if cnx: cnx.close()
+
+    @socketio.on('load_undelivered_messages')
+    def handle_load_undelivered_messages(data):
+        verify_jwt_in_request()
+        user_email = get_jwt()["email"]
+        contact_email = data.get("contact_email")
+
+        if not contact_email:
+            emit('error', {"error": "Contact email is missing"})
+            return
+        undelivered_messages = messaging_waiting(user_email, contact_email)
+
+        if undelivered_messages:
+            emit('messages_load', {"messages": undelivered_messages})
+        else:
+            emit('error', {"error": "No undelivered messages found"})
+
+    @socketio.on('mark_messages_as_read')
+    def handle_mark_messages_as_read(data):
+        print("read")
+        verify_jwt_in_request()
+        user_email = get_jwt()["email"]
+        contact_email = data.get("contact_email")
+
+        if not contact_email:
+            emit('error', {"error": "Contact email is missing"})
+            return
+        mark_messages_as_read_in_db(user_email, contact_email)

@@ -1,4 +1,6 @@
 import { dbPromise } from './db.js';
+import { socket } from './socketHandlers.js';
+
 
 const conversationArea = document.getElementById('conversation-area');
 
@@ -28,10 +30,20 @@ async function loadConversation(contactEmail) {
 
     await new Promise(res => { tx.oncomplete = res; });
 
+    socket.emit('load_undelivered_messages', {
+      contact_email: contactEmail
+    });
+
+    socket.emit('mark_messages_as_read', {
+      contact_email: contactEmail
+    });
+
+
   } catch (e) {
     console.error('[DB] failed to load conversation', e);
   }
 }
+
 
 function appendMessage(plaintext, kind) {
     //const plaintext = atob(blob); // TODO: decrypt if needed
