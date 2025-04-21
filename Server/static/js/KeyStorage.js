@@ -112,7 +112,22 @@ async function loadKeyPair(storageKey) {
   const rec = await getItem(storageKey);
   if (!rec) return null;
   const { pub, priv } = decodeBuffers(rec);
-  return { publicKey: pub, privateKey: priv };
+  return { pubKey: pub, privKey: priv };
+}
+
+async function loadSignedPreKey() {
+    const rec = await getItem('signedPreKey');
+    if (!rec) return null;
+
+    const { pub, priv, sig, keyId } = decodeBuffers(rec);
+    return {
+        keyId: keyId,
+        keyPair: {
+        pubKey: pub,
+        privKey: priv
+        },
+        signature: sig
+    };
 }
 
 // Persist all key material in three steps
@@ -154,40 +169,49 @@ async function persistKeyMaterial(keyMaterial) {
     return false;
   }
 }
-
-// Retrieve all stored key material
 async function loadKeyMaterial() {
   try {
-    const identityRec = await getItem('identityKey');
-    const signedRec   = await getItem('signedPreKey');
+    // Load identity key and signed prekey using existing helper functions
+    const identityKey = await loadKeyPair('identityKey');
+    const signedPreKey = await loadSignedPreKey();
 
-    console.debug('Loaded raw identityRec:', identityRec);
-    console.debug('Loaded raw signedRec:',   signedRec);
-
-    if (!identityRec || !signedRec) {
+    if (!identityKey || !signedPreKey) {
       console.warn('Missing identityKey or signedPreKey in IndexedDB');
       return null;
     }
 
-    // Identity
-    const id = decodeBuffers(identityRec);
+    // Get the next available prekey ID
+    const nextPreKeyId = await getNextAvailablePreKeyId();
 
-    // Signed pre-key (includes keyId and sig)
-    const spDecoded = decodeBuffers(signedRec);
+    // Use existing helper to get one prekey (the one before the next available)
+    const preKeyId = Math.max(1, nextPreKeyId - 1);
+    const preKey = await getPreKey(preKeyId);
+
+    // Create the prekeys array with just one prekey
+    const preKeys = preKey ? [
+      {
+        keyId: preKeyId,
+        keyPair: {
+          pubKey: preKey.pubKey,
+          privKey: preKey.privKey
+        }
+      }
+    ] : [];
 
     return {
       identityKeyPair: {
-        pubKey:  id.pub,
-        privKey: id.priv
+        pubKey: identityKey.pubKey,
+        privKey: identityKey.privKey
       },
       signedPreKey: {
-        keyId:    signedRec.keyId,
+        keyId: signedPreKey.keyId,
         keyPair: {
-          publicKey:  spDecoded.pub,
-          privateKey: spDecoded.priv
+          pubKey: signedPreKey.keyPair.pubKey,
+          privKey: signedPreKey.keyPair.privKey
         },
-        signature: spDecoded.sig
-      }
+        signature: signedPreKey.signature
+      },
+      preKeys: preKeys
     };
   } catch (error) {
     console.error('Failed to load key material:', error);
@@ -197,12 +221,51 @@ async function loadKeyMaterial() {
 
 // One‑time pre-key store/get
 async function storePreKey(preKeyId, keyPair) {
-  return storeKeyPair(`oneTimePreKey_${preKeyId}`, keyPair);
+  return storeKeyPair(`prekey-${preKeyId}`, keyPair);
 }
 
 async function getPreKey(preKeyId) {
-  return loadKeyPair(`oneTimePreKey_${preKeyId}`);
+  return loadKeyPair(`prekey-${preKeyId}`);
 }
+
+// Add functions for prekey management
+async function consumePreKey(preKeyId) {
+  const preKey = await getPreKey(preKeyId);
+  if (preKey) {
+    // Delete the prekey after retrieval
+    await runInStore('keys', 'readwrite', store =>
+      store.delete(`prekey-${preKeyId}`)
+    );
+  }
+  return preKey;
+}
+
+
+async function getNextAvailablePreKeyId() {
+  const db = await openDB();
+  const tx = db.transaction(['keys'], 'readonly');
+  const store = tx.objectStore('keys');
+  const request = store.getAllKeys();
+
+  const keys = await new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+
+  // Extract existing prekey IDs
+  const usedIds = keys
+    .filter(key => String(key).startsWith('prekey-'))
+    .map(key => parseInt(key.split('-')[1], 10));
+
+  // Find the next available ID (starting from 1)
+  let nextId = 1;
+  while (usedIds.includes(nextId)) {
+    nextId++;
+  }
+
+  return nextId;
+}
+
 
 export {
   arrayBufferToBase64,

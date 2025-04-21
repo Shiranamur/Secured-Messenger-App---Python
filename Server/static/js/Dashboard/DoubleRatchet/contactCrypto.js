@@ -12,39 +12,67 @@ const ZERO_SALT = new Uint8Array(32).buffer;
 /**
  * Setup cryptographic communication with a contact
  * @param {string} contactEmail - Email of the contact
+ * @param {string} communciationEndpoint - Endpoint for communication expects : 'receiving' or 'requesting'
  * @returns {Promise<Session>} - Initialized Double Ratchet session
  */
-async function setupCryptoForContact(contactEmail) {
+async function setupCryptoForContact(contactEmail, communciationEndpoint) {
   try {
-    console.debug('[CRYPTO] Setting up crypto for', contactEmail);
+    console.debug('[CRYPTO] Setting up crypto for', contactEmail, 'as', communciationEndpoint);
 
-    // 1. Fetch the contact's prekey bundle
-    const prekeyBundle = await fetchPrekeyBundle(contactEmail);
-
-    // 2. Load our identity key
+    // Load our identity key
     const ourKeyMaterial = await loadKeyMaterial();
     if (!ourKeyMaterial) {
       throw new Error('Failed to load our key material');
     }
 
-    // 3. Generate our ephemeral key pair for X3DH
-    const ourEphemeralKeyPair = await CurveHelper.generateKeyPair();
+    let session;
 
-    // 4. Perform X3DH to establish shared secret
-    const sharedSecret = await performX3DH(ourKeyMaterial, prekeyBundle, ourEphemeralKeyPair);
+    if (communciationEndpoint === 'requesting') {
+      // === INITIATOR PATH ===
 
-    // 5. Send the ephemeral public key to the contact
-    await sendEphemeralKey(contactEmail, ourEphemeralKeyPair.pubKey);
+      // 1. Fetch the contact's prekey bundle
+      const prekeyBundle = await fetchPrekeyBundle(contactEmail);
 
-    // 6. Initialize a Double Ratchet session
-    const session = new Session(contactEmail);
-    await session.initializeAsInitiator(sharedSecret);
+      // 2. Generate our ephemeral key pair for X3DH
+      const ourEphemeralKeyPair = await CurveHelper.generateKeyPair();
 
-    // 7. Store the session
+      // 3. Perform X3DH to establish shared secret
+      const sharedSecret = await performX3DH(ourKeyMaterial, prekeyBundle, ourEphemeralKeyPair);
+
+      // 4. Send the ephemeral key to the contact
+      await sendEphemeralKey(contactEmail, ourEphemeralKeyPair.pubKey);
+
+      // 5. Initialize a Double Ratchet session as initiator
+      session = new Session(contactEmail);
+      await session.initializeAsInitiator(sharedSecret);
+
+    } else if (communciationEndpoint === 'receiving') {
+      // === RECIPIENT PATH ===
+
+      // 1. Fetch the ephemeral key sent by initiator
+      const ephemeralKey = await fetchEphemeralKey(contactEmail);
+
+      // 2. Perform X3DH as recipient using the ephemeral key
+      const sharedSecret = await performX3DHasRecipient(
+        ourKeyMaterial,
+        contactEmail,
+        base64ToArrayBuffer(ephemeralKey)
+      );
+
+      // 3. Initialize a Double Ratchet session as recipient
+      session = new Session(contactEmail);
+      await session.initializeAsInitiator(sharedSecret); // Using same method since only root key matters
+
+    } else {
+      throw new Error(`Invalid communication endpoint: ${communciationEndpoint}`);
+    }
+
+    // Store the session
     await saveSession(session);
 
     console.debug('[CRYPTO] Successfully set up crypto for', contactEmail);
     return session;
+
   } catch (error) {
     console.error('[CRYPTO] Error setting up crypto for contact:', error);
     throw error;
@@ -76,6 +104,31 @@ async function fetchPrekeyBundle(contactEmail) {
   return prekeyBundle;
 }
 
+
+/**
+ * Fetch the ephemeral key sent by the initiator
+ * @param {string} initiatorEmail - Email of the initiator
+ * @returns {Promise<string>} - Base64 encoded ephemeral key
+ */
+async function fetchEphemeralKey(initiatorEmail) {
+  const response = await fetch(`/api/x3dh_params/ephemeral/retrieve`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'X-CSRF-TOKEN': getCookie('csrf_access_token'),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({sender_email: initiatorEmail})
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ephemeral key: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.ephemeral_key;
+}
+
 /**
  * Send the ephemeral key to the contact
  * @param {string} contactEmail - Email of the contact
@@ -83,7 +136,7 @@ async function fetchPrekeyBundle(contactEmail) {
  */
 async function sendEphemeralKey(contactEmail, ephemeralKey) {
   const ephemeralKeyBase64 = arrayBufferToBase64(ephemeralKey);
-  const response = await fetch('/api/x3dh_params', {
+  const response = await fetch('/api/x3dh_params/ephemeral/send', {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -104,6 +157,30 @@ async function sendEphemeralKey(contactEmail, ephemeralKey) {
 }
 
 /**
+ * Fetch another user's identity key
+ * @param {string} email - The user's email
+ * @returns {Promise<ArrayBuffer>} - Their identity key
+ */
+async function fetchIdentityKey(email) {
+  const response = await fetch(`/api/identity_key`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'X-CSRF-TOKEN': getCookie('csrf_access_token'),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch identity key: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return base64ToArrayBuffer(data.identity_key);
+}
+
+/**
  * Perform X3DH key agreement
  * @param {Object} ourKeyMaterial - Our identity keys
  * @param {Object} theirPrekeyBundle - Contact's prekey bundle
@@ -121,7 +198,8 @@ async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPai
     console.log('DH inputs:', {
       theirIdentityKeyLength: theirIdentityKey.byteLength,
       theirSignedPreKeyLength: theirSignedPreKey.byteLength,
-      theirOneTimePreKeyLength: theirOneTimePreKey?.byteLength || 0
+      ourKeyMaterial_identityKeyPair_privKey: ourKeyMaterial.identityKeyPair.privKey,
+      ourEphemeralKeyPair_privKey: ourEphemeralKeyPair.privKey
     });
 
     // Calculate DH outputs
@@ -158,11 +236,6 @@ async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPai
     //   );
     // }
 
-    // Define the missing variables for logging and concatenation
-    const dh1Bytes = new Uint8Array(dh1);
-    const dh2Bytes = new Uint8Array(dh2);
-    const dh3Bytes = new Uint8Array(dh3);
-
     // Derive the shared secret using HKDF
     // Derive the shared secret
     // In Signal Protocol's implementation, HKDF.deriveSecrets returns an array of three ArrayBuffers:
@@ -185,6 +258,76 @@ async function performX3DH(ourKeyMaterial, theirPrekeyBundle, ourEphemeralKeyPai
     throw error;
   }
 }
+
+
+/**
+ * Perform X3DH key agreement as recipient
+ * @param {Object} ourKeyMaterial - Our key material including signed prekey
+ * @param {string} theirEmail - Initiator's email
+ * @param {ArrayBuffer} theirEphemeralKey - Initiator's ephemeral key
+ * @returns {Promise<ArrayBuffer>} - Derived shared secret
+ */
+async function performX3DHasRecipient(ourKeyMaterial, theirEmail, theirEphemeralKey) {
+  try {
+
+    // 1. Get their identity key
+    const theirIdentityKey = await fetchIdentityKey(theirEmail);
+
+    console.log('DH inputs:', {
+      ourKeyMaterial_signedPrekey_keyPair_privKey: ourKeyMaterial.signedPreKey.keyPair.privKey.byteLength,
+      ourKeyMaterial_identityKeyPair_privKey: ourKeyMaterial.identityKeyPair.privKey.byteLength,
+      theirEphemeralKeyLength: theirEphemeralKey.byteLength,
+      theirIdentityKeyLength: theirIdentityKey.byteLength,
+    });
+
+
+    // 2. Calculate DH outputs - PROPERLY MIRRORED from initiator's calculations
+    // DH1: initiator uses (theirSignedPreKey, ourIdentityPrivKey)
+    // Recipient should use (theirIdentityKey, ourSignedPreKeyPrivKey)
+    const dh1 = await CurveHelper.calculateAgreement(
+      theirIdentityKey,
+      ourKeyMaterial.signedPreKey.keyPair.privKey
+    );
+
+    // DH2: initiator uses (theirIdentityKey, ourEphemeralPrivKey)
+    // Recipient should use (theirEphemeralKey, ourIdentityPrivKey)
+    const dh2 = await CurveHelper.calculateAgreement(
+      theirEphemeralKey,
+      ourKeyMaterial.identityKeyPair.privKey
+    );
+
+    // DH3: initiator uses (theirSignedPreKey, ourEphemeralPrivKey)
+    // Recipient should use (theirEphemeralKey, ourSignedPreKeyPrivKey)
+    const dh3 = await CurveHelper.calculateAgreement(
+      theirEphemeralKey,
+      ourKeyMaterial.signedPreKey.keyPair.privKey
+    );
+
+    // 3. Concatenate DH outputs in the SAME ORDER as initiator
+    const concatenated = concatenateArrayBuffers(dh1, dh2, dh3);
+
+    console.log('DH outputs:', {
+      dh1Length: dh1.byteLength,
+      dh2Length: dh2.byteLength,
+      dh3Length: dh3.byteLength
+    });
+
+    // 4. Derive the shared secret using HKDF with IDENTICAL parameters
+    const sharedSecrets = await window.libsignal.HKDF.deriveSecrets(
+      concatenated,
+      ZERO_SALT,
+      new TextEncoder().encode(X3DH_INFO).buffer,
+      32
+    );
+
+    // Return the root key for session initialization
+    return sharedSecrets[0];
+  } catch (error) {
+    console.error('[CRYPTO] Error in X3DH as recipient:', error);
+    throw error;
+  }
+}
+
 
 /**
  * Concatenate multiple ArrayBuffers
