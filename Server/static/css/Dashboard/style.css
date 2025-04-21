@@ -1,0 +1,47 @@
+.dashboard-container {
+    display: flex;
+    height: 80vh;
+}
+.conversations-panel {
+    flex: 2;
+    border-right: 1px solid #ccc;
+    padding: 15px;
+}
+.contacts-panel {
+    flex: 1;
+    padding: 15px;
+}
+.contact-item {
+    cursor: pointer;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+.contact-item.selected {
+    background-color: #e6f7ff;
+}
+#conversation-area {
+    height: 70%;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+#message-input {
+    display: flex;
+    gap: 10px;
+}
+#new-message {
+    flex: 1;
+}
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #4CAF50;
+  color: white;
+  padding: 15px;
+  border-radius: 4px;
+  z-index: 1000;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}

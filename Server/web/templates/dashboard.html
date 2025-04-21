@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+<div class="dashboard-container">
+    <!-- Left panel: Conversations -->
+    <div class="conversations-panel">
+        <h2>Conversations</h2>
+        <div id="conversation-area">
+            <p class="empty-state">Select a contact to view conversation</p>
+        </div>
+        <div id="message-input" style="display: none;">
+            <input type="text" id="new-message" placeholder="Type a message...">
+            <button id="send-message">Send</button>
+        </div>
+    </div>
+
+    <!-- Right panel: Contacts -->
+    <div class="contacts-panel">
+        <h2>{{ current_user_email }}</h2>
+        <h2>Contacts</h2>
+        <ul class="contacts-list">
+        </ul>
+        <br>
+        <h3>Add Contact</h3>
+        <form id="add-contact-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="add-contact-email">Email:</label>
+            <input type="email" id="add-contact-email" placeholder="Enter email" required>
+            <button type="submit">Add</button>
+        </form>
+
+        <div id="requests-section" style="display: none;">
+          <h3>Contact Requests</h3>
+          <div id="contact-requests"></div>
+        </div>
+    </div>
+</div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/Dashboard/style.css') }}">
+<script src="{{ url_for('static', filename='js/libsignal-protocol.js') }}"></script>
+<script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/Dashboard/dashboard.js') }}"></script>
+
+{% endblock %}
