@@ -1,156 +1,207 @@
 ﻿// KeyStorage.js
-const DB_NAME = 'signal-keys';
+
+const DB_NAME    = 'signal-keys';
 const DB_VERSION = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('keys')) {
+        db.createObjectStore('keys');
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror   = (e) => reject(e.target.error);
+  });
+}
+
+function runInStore(storeName, mode, operation) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const db = await openDB();
+      const tx = db.transaction([storeName], mode);
+      const store = tx.objectStore(storeName);
+      const request = operation(store);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror   = (e) => reject(e.target.error);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
 
 // Convert ArrayBuffer to Base64
 function arrayBufferToBase64(buffer) {
-  return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+  return btoa(
+    String.fromCharCode.apply(null, new Uint8Array(buffer))
+  );
 }
 
 // Convert Base64 to ArrayBuffer
 function base64ToArrayBuffer(str) {
   const binary = atob(str);
-  const bytes = new Uint8Array(binary.length);
+  const bytes  = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes.buffer;
 }
 
-// Open database connection
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('keys')) {
-        db.createObjectStore('keys');
-      }
-    };
-
-    request.onsuccess = (event) => resolve(event.target.result);
-    request.onerror = (event) => reject(event.target.error);
-  });
-}
-
-// Store a value with given key
-async function setItem(key, value) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['keys'], 'readwrite');
-    const store = transaction.objectStore('keys');
-    const request = store.put(value, key);
-
-    request.onsuccess = () => resolve();
-    request.onerror = (event) => reject(event.target.error);
-  });
-}
-
-// Get a value by key
-async function getItem(key) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['keys'], 'readonly');
-    const store = transaction.objectStore('keys');
-    const request = store.get(key);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = (event) => reject(event.target.error);
-  });
-}
-
-async function storePreKey(preKeyId, keyPair) {
-  return setItem(`oneTimePreKey_${preKeyId}`, {
-    pub:  arrayBufferToBase64(keyPair.publicKey),
-    priv: arrayBufferToBase64(keyPair.privateKey),
-  });
-}
-
-async function getPreKey(preKeyId) {
-  const data = await getItem(`oneTimePreKey_${preKeyId}`);
-  if (!data) return null;
+// Normalize either { pubKey, privKey } or { publicKey, privateKey }
+function normalizeKeyPair(kp) {
   return {
-    publicKey:  base64ToArrayBuffer(data.pub),
-    privateKey: base64ToArrayBuffer(data.priv),
+    pub:  kp.pubKey      || kp.publicKey,
+    priv: kp.privKey     || kp.privateKey
   };
 }
 
-// Persist all key material
+// Encode every ArrayBuffer in an object to Base64 strings
+function encodeBuffers(map) {
+  const out = {};
+  for (const [field, buf] of Object.entries(map)) {
+    out[field] = arrayBufferToBase64(buf);
+  }
+  return out;
+}
+
+function decodeBuffers(map) {
+  const out = {};
+  for (const [field, val] of Object.entries(map)) {
+    if (typeof val === 'string') {
+      try {
+        console.debug(`Decoding field "${field}":`, val);
+        out[field] = base64ToArrayBuffer(val);
+      } catch (err) {
+        console.error(`Failed to decode Base64 for "${field}":`, val);
+        throw err;
+      }
+    } else {
+      out[field] = val;
+    }
+  }
+  return out;
+}
+
+// Merge non-buffer extras (e.g. { keyId }) with the encoded buffer fields
+function buildRecord({ buffers, extras = {} }) {
+  return { ...extras, ...encodeBuffers(buffers) };
+}
+
+function setItem(key, value) {
+  return runInStore('keys', 'readwrite', store =>
+    store.put(value, key)
+  );
+}
+
+function getItem(key) {
+  return runInStore('keys', 'readonly', store =>
+    store.get(key)
+  );
+}
+
+async function storeKeyPair(storageKey, keyPair) {
+  const { pub, priv } = normalizeKeyPair(keyPair);
+  const record = buildRecord({ buffers: { pub, priv } });
+  await setItem(storageKey, record);
+}
+
+async function loadKeyPair(storageKey) {
+  const rec = await getItem(storageKey);
+  if (!rec) return null;
+  const { pub, priv } = decodeBuffers(rec);
+  return { publicKey: pub, privateKey: priv };
+}
+
+// Persist all key material in three steps
 async function persistKeyMaterial(keyMaterial) {
   if (!keyMaterial) return false;
 
   try {
-    console.log('Key material structure:', JSON.stringify(keyMaterial, (key, value) => {
-      if (value instanceof ArrayBuffer) return '[ArrayBuffer]';
-      return value;
-    }));
+    console.log(
+      'Key material structure:',
+      JSON.stringify(
+        keyMaterial,
+        (k, v) => v instanceof ArrayBuffer ? '[ArrayBuffer]' : v
+      )
+    );
 
-    // Store identity key
-    await setItem('identityKey', {
-      pub: arrayBufferToBase64(keyMaterial.identityKeyPair.pubKey),
-      priv: arrayBufferToBase64(keyMaterial.identityKeyPair.privKey)
-    });
+    // 1) Identity key
+    const idPair   = normalizeKeyPair(keyMaterial.identityKeyPair);
+    const idRecord = buildRecord({ buffers: { pub: idPair.pub, priv: idPair.priv } });
+    await setItem('identityKey', idRecord);
 
-    // Store signed prekey (handle different possible property names)
-    const signedPreKeyPub = keyMaterial.signedPreKey.keyPair.pubKey ||
-                           keyMaterial.signedPreKey.keyPair.publicKey;
-    const signedPreKeyPriv = keyMaterial.signedPreKey.keyPair.privKey ||
-                            keyMaterial.signedPreKey.keyPair.privateKey;
+    // 2) Signed pre-key
+    const sp        = keyMaterial.signedPreKey;
+    const spPair    = normalizeKeyPair(sp.keyPair);
+    const spBuffers = { pub: spPair.pub, priv: spPair.priv, sig: sp.signature };
+    const spRecord  = buildRecord({ buffers: spBuffers, extras: { keyId: sp.keyId } });
+    await setItem('signedPreKey', spRecord);
 
-    await setItem('signedPreKey', {
-      keyId: keyMaterial.signedPreKey.keyId,
-      pub: arrayBufferToBase64(signedPreKeyPub),
-      priv: arrayBufferToBase64(signedPreKeyPriv),
-      sig: arrayBufferToBase64(keyMaterial.signedPreKey.signature)
-    });
-
-    // Store one-time prekeys
+    // 3) One-time pre-keys
     for (const pk of keyMaterial.preKeys) {
-      // Make sure keyId is defined and correct
-      if (pk.keyId === undefined) continue;
-
-      const pkPub = pk.keyPair.pubKey || pk.keyPair.publicKey;
-      const pkPriv = pk.keyPair.privKey || pk.keyPair.privateKey;
-
-      await setItem(`prekey-${pk.keyId}`, {
-        pub: arrayBufferToBase64(pkPub),
-        priv: arrayBufferToBase64(pkPriv)
-      });
+      if (pk.keyId == null) continue;
+      const onePair   = normalizeKeyPair(pk.keyPair);
+      const oneRecord = buildRecord({ buffers: { pub: onePair.pub, priv: onePair.priv } });
+      await setItem(`prekey-${pk.keyId}`, oneRecord);
     }
 
     return true;
-  } catch (error) {
-    console.error('Failed to persist key material:', error);
+  } catch (err) {
+    console.error('Failed to persist key material:', err);
     return false;
   }
 }
 
-
 // Retrieve all stored key material
 async function loadKeyMaterial() {
   try {
-    const identityKey = await getItem('identityKey');
-    const signedPreKey = await getItem('signedPreKey');
+    const identityRec = await getItem('identityKey');
+    const signedRec   = await getItem('signedPreKey');
+
+    console.debug('Loaded raw identityRec:', identityRec);
+    console.debug('Loaded raw signedRec:',   signedRec);
+
+    if (!identityRec || !signedRec) {
+      console.warn('Missing identityKey or signedPreKey in IndexedDB');
+      return null;
+    }
+
+    // Identity
+    const id = decodeBuffers(identityRec);
+
+    // Signed pre-key (includes keyId and sig)
+    const spDecoded = decodeBuffers(signedRec);
 
     return {
       identityKeyPair: {
-        pubKey: base64ToArrayBuffer(identityKey.pub),
-        privKey: base64ToArrayBuffer(identityKey.priv)
+        pubKey:  id.pub,
+        privKey: id.priv
       },
       signedPreKey: {
-        keyId: signedPreKey.keyId,
+        keyId:    signedRec.keyId,
         keyPair: {
-          publicKey: base64ToArrayBuffer(signedPreKey.pub),
-          privateKey: base64ToArrayBuffer(signedPreKey.priv)
+          publicKey:  spDecoded.pub,
+          privateKey: spDecoded.priv
         },
-        signature: base64ToArrayBuffer(signedPreKey.sig)
+        signature: spDecoded.sig
       }
     };
   } catch (error) {
     console.error('Failed to load key material:', error);
     return null;
   }
+}
+
+// One‑time pre-key store/get
+async function storePreKey(preKeyId, keyPair) {
+  return storeKeyPair(`oneTimePreKey_${preKeyId}`, keyPair);
+}
+
+async function getPreKey(preKeyId) {
+  return loadKeyPair(`oneTimePreKey_${preKeyId}`);
 }
 
 export {
