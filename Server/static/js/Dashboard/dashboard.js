@@ -1,4 +1,4 @@
-import { initializeAddContactForm, fetchContacts } from './contacts.js';
+import { initializeAddContactForm} from './contacts.js';
 import { setupSendMessage } from './messaging.js';
 import { setupSocketHandlers, socket } from './socketHandlers.js';
 import {refreshPreKeysIfNeeded} from "../X3DH.js";
@@ -7,7 +7,6 @@ let currentUserEmail = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     console.debug('[BOOT] DOMContentLoaded');
-    fetchContacts();
     initializeAddContactForm();
     setupSendMessage();
     setupSocketHandlers();
@@ -22,7 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUserEmail = document.querySelector('.contacts-panel h2').textContent.trim();
 
     // Request contacts list via WebSocket
-    socket.emit('get_contacts');
+    socket.emit('contacts_list');
 
     const messageInputBox = document.getElementById('message-input');
     console.debug('[BOOT] #message-input display =', getComputedStyle(messageInputBox).display);

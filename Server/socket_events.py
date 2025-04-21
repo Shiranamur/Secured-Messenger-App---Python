@@ -15,6 +15,15 @@ def register_handlers(socketio):
         join_room(user_id)
         print(f"User {user_id} connected with socket ID {request.sid}")
 
+    @socketio.on('identity_check')
+    def handle_identity_check():
+        try:
+            verify_jwt_in_request()
+            user_id = get_jwt_identity()
+            emit('identity_check_response', {'identity': user_id})
+        except Exception as e:
+            print(f"Error in identity check: {e}")
+            emit('error', {"error": "Identity verification failed"})
 
     @socketio.on('disconnect')
     def handle_disconnect():
@@ -67,6 +76,31 @@ def register_handlers(socketio):
             if cnx: cnx.rollback()
             print(e)
             emit('error', {"error": "Failed to send message"})
+        finally:
+            if cur: cur.close()
+            if cnx: cnx.close()
+
+
+    @socketio.on('contacts_list')
+    def handle_contacts_list():
+        verify_jwt_in_request()
+        user_id = get_jwt_identity()
+        cnx = None
+        cur = None
+        try:
+            cnx = get_db_cnx()
+            cur = cnx.cursor(dictionary=True)
+            cur.execute(
+                "SELECT u.email FROM users u "
+                "JOIN contacts c ON (u.id = c.user2_id) "
+                "WHERE c.user1_id = %s",
+                (user_id,)
+            )
+            contacts = cur.fetchall()
+            emit('contacts_list_response', {"contacts": contacts})
+        except Exception as e:
+            print(e)
+            emit('error', {"error": "Failed to fetch contacts"})
         finally:
             if cur: cur.close()
             if cnx: cnx.close()

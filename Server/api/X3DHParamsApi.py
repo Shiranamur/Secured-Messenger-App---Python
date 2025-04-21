@@ -39,14 +39,18 @@ class X3DHParamsApi(MethodView):
             from Server.socket_manager import socketio
             from Server.socket_events import user_sessions
 
-            # Get Bob's user ID
+            # Before socket emit
             recipient_id = get_id_from_email(recipient_email)
-
+            print(f"Trying to notify recipient_id: {recipient_id}, in user_sessions: {recipient_id in user_sessions}")
             if recipient_id in user_sessions:
+                recipient_sid = user_sessions[recipient_id]
+                print(f"Emitting x3dh_params_ready to {recipient_email} (ID: {recipient_id}) with SID: {recipient_sid}")
                 socketio.emit('x3dh_params_ready', {
                     'from': sender_email,
                     'notification': f'{sender_email} wants to establish secure communication'
-                }, room=user_sessions[recipient_id])
+                }, room=recipient_sid)  # Use the SID directly
+            else:
+                print(f"User {recipient_email} (ID: {recipient_id}) not online. Active sessions: {user_sessions}")
 
             return jsonify({"status": "success"}), 200
         except Exception as e:

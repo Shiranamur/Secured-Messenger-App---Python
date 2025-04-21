@@ -11,7 +11,16 @@ const socket = io('/', {
 });
 
 function setupSocketHandlers() {
-  socket.on('connect', () => console.debug('[WS] Connected'));
+  socket.on('connect', () => {
+    console.debug('[WS] Connected with socket.id:', socket.id);
+    // Verify identity is set correctly
+    socket.emit('identity_check');
+  });
+
+  // TODO debug only
+  socket.on('identity_check_response', (data) => {
+    console.debug('[WS] Server identifies me as:', data.identity);
+  });
 
   socket.on('message', async (payload) => {
     console.debug('[WS] Received message event', payload);
@@ -40,7 +49,7 @@ function setupSocketHandlers() {
     }
   });
 
-  socket.on('contacts_list', (data) => {
+  socket.on('contacts_list_response', (data) => {
     console.debug('[WS] Received contacts:', data);
     updateContactsList(data.contacts);
   });
@@ -108,6 +117,8 @@ function setupSocketHandlers() {
       console.error('[WS] Failed to setup crypto for new contact:', error);
     }
   });
+
+  console.debug('[WS] Socket handlers have been set up successfully');
 }
 
 export { socket, setupSocketHandlers };

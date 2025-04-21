@@ -115,31 +115,14 @@ function initializeAddContactForm() {
     });
 }
 
-// Function to fetch contacts from server
-async function fetchContacts() {
-  try {
-    const response = await fetch('/api/contact', {
-      method: 'GET',
-      credentials: 'include',
-      headers: {'X-CSRF-TOKEN': getCookie('csrf_access_token')}
-    });
-    const data = await response.json();
-    if (data.status === 'success') {
-      updateContactsList(data.contacts);
-    } else {
-      console.error('[CONTACT] Error fetching contacts:', data.message);
-    }
-  } catch (err) {
-    console.error('[CONTACT] Fetch contacts error:', err);
-  }
-}
-
 function updateContactsList(contacts) {
     const contactsList = document.querySelector('.contacts-list');
     contacts.forEach(contact => {
-        const li = createContactElement(contact.email)
+        // Extract the email from the contact object
+        const email = contact.email || contact;
+        const li = createContactElement(email);
         contactsList.appendChild(li);
     });
 }
 
-export { createContactElement, selectContact, removeContact, initializeAddContactForm, updateContactsList, fetchContacts};
+export { createContactElement, selectContact, removeContact, initializeAddContactForm, updateContactsList};
