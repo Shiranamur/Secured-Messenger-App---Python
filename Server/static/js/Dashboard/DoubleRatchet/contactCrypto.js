@@ -1,7 +1,7 @@
 ﻿import { arrayBufferToBase64, base64ToArrayBuffer, loadKeyMaterial } from '../../KeyStorage.js';
 import { Session } from './session.js';
 import { saveSession } from './sessionStorage.js';
-import { getCookie } from '../utils.js';
+import { getCookie } from '../../utils.js';
 const CurveHelper = window.libsignal.Curve;
 // contactCrypto.js - Handle cryptographic setup for contacts
 

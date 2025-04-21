@@ -1,5 +1,5 @@
 import { isValidEmail, validateBase64Length, showValidationError } from './InputValidation.js'
-import {createKeys} from "./X3DH.js";
+import {createKeys} from "../X3DH.js";
 import { persistKeyMaterial, arrayBufferToBase64 } from '../KeyStorage.js';
 
 

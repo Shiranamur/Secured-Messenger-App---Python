@@ -60,6 +60,22 @@ async function getItem(key) {
   });
 }
 
+async function storePreKey(preKeyId, keyPair) {
+  return setItem(`oneTimePreKey_${preKeyId}`, {
+    pub:  arrayBufferToBase64(keyPair.publicKey),
+    priv: arrayBufferToBase64(keyPair.privateKey),
+  });
+}
+
+async function getPreKey(preKeyId) {
+  const data = await getItem(`oneTimePreKey_${preKeyId}`);
+  if (!data) return null;
+  return {
+    publicKey:  base64ToArrayBuffer(data.pub),
+    privateKey: base64ToArrayBuffer(data.priv),
+  };
+}
+
 // Persist all key material
 async function persistKeyMaterial(keyMaterial) {
   if (!keyMaterial) return false;
@@ -110,6 +126,7 @@ async function persistKeyMaterial(keyMaterial) {
   }
 }
 
+
 // Retrieve all stored key material
 async function loadKeyMaterial() {
   try {
@@ -142,5 +159,7 @@ export {
   persistKeyMaterial,
   loadKeyMaterial,
   getItem,
-  setItem
+  setItem,
+  storePreKey,
+  getPreKey
 };

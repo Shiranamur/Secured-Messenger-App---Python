@@ -1,6 +1,6 @@
 ﻿// import { loadConversation } from './conversation.js';
-import { getCookie } from './utils.js';
 import { setupCryptoForContact } from './DoubleRatchet/contactCrypto.js';
+import { getCookie } from '../utils.js';
 
 function createContactElement(email) {
     console.debug('[CONTACT] Creating element for', email);

@@ -1,7 +1,7 @@
 ﻿import { updateContactsList } from './contacts.js';
 import { appendMessage } from './conversation.js';
-import { getCookie } from './utils.js';
 import { handleIncomingContact } from './DoubleRatchet/incomingContact.js';
+import { getCookie } from '../utils.js';
 import { dbPromise } from './db.js';
 
 const socket = io('/', {
