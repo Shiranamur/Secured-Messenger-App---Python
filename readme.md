@@ -29,6 +29,7 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 4. **Environnement virtuel & dépendances**
 
    ```bash
+   cd .\Secured-Messenger-App---Python\
    py -3 -m venv .venv
    .venv\Scripts\activate  
    pip install -r requirements.txt
