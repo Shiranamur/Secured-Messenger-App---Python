@@ -4,12 +4,12 @@ USE secured_messenger;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    pwdhash VARCHAR(255) NOT NULL,
-    salt VARCHAR(255) NOT NULL,
-    identity_public_key VARCHAR(255) NOT NULL,
-    signed_prekey VARCHAR(255) NOT NULL,
-    signed_prekey_signature VARCHAR(255) NOT NULL,
+    email VARCHAR(240) NOT NULL UNIQUE,
+    pwdhash VARCHAR(240) NOT NULL,
+    salt VARCHAR(240) NOT NULL,
+    identity_public_key VARCHAR(240) NOT NULL,
+    signed_prekey VARCHAR(240) NOT NULL,
+    signed_prekey_signature VARCHAR(240) NOT NULL,
     PRIMARY KEY (id)
 );
 
@@ -56,5 +56,5 @@ CREATE TABLE x3dh_params (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_email) REFERENCES users(email),
     FOREIGN KEY (recipient_email) REFERENCES users(email),
-    UNIQUE KEY unique_request (sender_email, recipient_email)
+    UNIQUE KEY unique_request (sender_email(100), recipient_email(100))
 );
