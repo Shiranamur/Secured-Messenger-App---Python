@@ -17,7 +17,7 @@ const ZERO_SALT = new Uint8Array(32).buffer;
  * @returns {Promise<Session>} - Initialized Double Ratchet session
  */
 async function setupCryptoForContact(contactEmail, communicationEndpoint) {
-   try {
+  try {
     console.debug('[CRYPTO] Setting up crypto for', contactEmail, 'as', communicationEndpoint);
 
     // Load our identity key
@@ -41,22 +41,22 @@ async function setupCryptoForContact(contactEmail, communicationEndpoint) {
 
       // 2) Derive the shared secret via X3DH
       const sharedSecret = await performX3DH(
-        ourKeyMaterial,
-        prekeyBundle,
-        ourEphemeral
+          ourKeyMaterial,
+          prekeyBundle,
+          ourEphemeral
       );
 
       // 3) Send our ephemeral → server → responder
       await sendEphemeralKey(
-        contactEmail,
-        ourEphemeral.pubKey,
-        prekeyBundle.one_time_prekey?.prekey_id
+          contactEmail,
+          ourEphemeral.pubKey,
+          prekeyBundle.one_time_prekey?.prekey_id
       );
 
       // 4) WAIT for exactly one ratchet_response, then finish init
       console.log("[CRYPTO] Waiting for ratchet_response from responder...");
       return new Promise((resolve, reject) => {
-        socket.once('ratchet_response', async ({ from, ratchet_key }) => {
+        socket.once('ratchet_response', async ({from, ratchet_key}) => {
           if (from !== contactEmail) {
             console.warn('got ratchet_response for', from, '– ignoring');
             return;
@@ -80,12 +80,12 @@ async function setupCryptoForContact(contactEmail, communicationEndpoint) {
     }
 
     throw new Error(`Invalid communication endpoint: ${communicationEndpoint}`);
-  }
-  catch (e) {
+  } catch (e) {
     throw new Error(`[ContactCrypto] Error in setupCryptoForContact: ${e.message}`);
   }
-
 }
+
+
 
 
 /**

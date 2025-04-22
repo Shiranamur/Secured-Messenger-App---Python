@@ -32,52 +32,75 @@ class Session {
     }
 
 
-    /**
-     * One-round initiator initialization
-     * @param {ArrayBuffer} sharedSecret - X3DH shared secret
-     * @param {ArrayBuffer} theirRatchetKey - Responder's ephemeral public key
-     */
-    async initializeAsInitiator(sharedSecret, theirRatchetKey) {
-      if (!sharedSecret || !theirRatchetKey) {
-        throw new Error('Shared secret and ratchet key are required');
-      }
-
-      // 1) Import responder's public ratchet key
-      this.DHr = theirRatchetKey;
-
-      // 2) Generate our ephemeral ratchet keypair
-      this.DHs = await window.libsignal.Curve.generateKeyPair();
-
-      // 3) Seed the root key from X3DH
-      this.RK = sharedSecret;
-
-      // 4) Perform one ratchet step → derives new RK, CKs, CKr
-      await this.ratchetStep();
-
-      this.initialized = true;
-      return this.serialize();
-    }
-
   /**
-   * Initialize the responder side (no change needed here).
-   * @param {ArrayBuffer} sharedSecret
-   * @param {ArrayBuffer} theirRatchetKey
+   * Derive initial root‐and‐chain keys from the X3DH shared secret.
+   * Both sides call this with the *same* sharedSecret, and get
+   * the *same* RK, CKs, CKr.
+   *
+   * @param {ArrayBuffer} sharedSecret – 32‑byte X3DH output
+   * @returns {{RK:ArrayBuffer, CKs:ArrayBuffer, CKr:ArrayBuffer}}
    */
-  async initializeAsResponder(sharedSecret, theirRatchetKey) {
-    if (!sharedSecret || !theirRatchetKey) {
-      throw new Error('Shared secret and ratchet key are required');
+  async deriveInitialRootAndChains(sharedSecret) {
+    if (!sharedSecret) {
+      throw new Error("Shared secret is required");
     }
+    const info = new TextEncoder().encode("X3DH_DoubleRatchet_Init").buffer;
+    // 96 bytes → 32 RK + 32 CKs + 32 CKr
+    const derived = await window.libsignal.HKDF.deriveSecrets(
+      sharedSecret,
+      new Uint8Array(32).buffer, // zero‑salt
+      info,
+      96
+    );
+    let buf, RK, CKs, CKr;
+    if (Array.isArray(derived)) {
+      [RK, CKs, CKr] = derived;
+    } else {
+      buf  = new Uint8Array(derived);
+      RK   = buf.slice(0,32).buffer;
+      CKs  = buf.slice(32,64).buffer;
+      CKr  = buf.slice(64,96).buffer;
+    }
+    return { RK, CKs, CKr };
+  }
 
-    this.DHr = theirRatchetKey;
+ /**
+   * Initiator bootstrap: just carve out keys from X3DH root.
+   * @param {ArrayBuffer} sharedSecret
+   */
+  async initializeAsInitiator(sharedSecret) {
+    if (!sharedSecret) throw new Error("Shared secret is required");
+
+    // 1) Generate our first ratchet keypair so DHs is never null
     this.DHs = await window.libsignal.Curve.generateKeyPair();
-    this.RK  = sharedSecret;
 
-    // This does exactly the same ratchetStep as the initiator now
-    await this.ratchetStep();
+    // 2) Carve out RK, CKs, CKr from the X3DH shared secret
+    const { RK, CKs, CKr } = await this.deriveInitialRootAndChains(sharedSecret);
+    this.RK  = RK;
+    this.CKs = CKs;
+    this.CKr = CKr;
 
     this.initialized = true;
     return this.serialize();
   }
+
+  /**
+   * Responder bootstrap: same exact carve‑out from X3DH root.
+   * @param {ArrayBuffer} sharedSecret
+   * @param {ArrayBuffer} theirRatchetKey – we still need their X3DH ephemeral to decrypt their first msg
+   */
+  async initializeAsResponder(sharedSecret, theirRatchetKey) {
+    this.DHr = theirRatchetKey;   // so on first decrypt we can do the ratchet
+    this.DHs = await window.libsignal.Curve.generateKeyPair();
+
+    const { RK, CKs, CKr } = await this.deriveInitialRootAndChains(sharedSecret);
+    this.RK  = RK;
+    this.CKs = CKs;
+    this.CKr = CKr;
+    this.initialized = true;
+    return this.serialize();
+  }
+
 
 
     /**
@@ -505,6 +528,56 @@ class Session {
             }
         }
         console.log("=========================");
+    }
+
+    /**
+     * One‑round handshake for the initiator.
+     * @param {ArrayBuffer} sharedSecret      – X3DH output
+     * @param {ArrayBuffer} initiatorEphemeralPriv  – YOUR X3DH ephemeral private key
+     * @param {ArrayBuffer} responderRatchetPub     – the key you get in ratchet_response
+     */
+    async initializeHandshake(
+      sharedSecret,
+      initiatorEphemeralPriv,
+      responderRatchetPub
+    ) {
+      if (!sharedSecret || !initiatorEphemeralPriv || !responderRatchetPub) {
+        throw new Error("Need shared secret, your ephemeral priv, and their ratchet pub");
+      }
+
+      // 1) seed salt = sharedSecret
+      this.RK = sharedSecret;
+
+      // 2) compute the handshake DH
+      const handshakeSecret = await window.libsignal.Curve.calculateAgreement(
+        responderRatchetPub,
+        initiatorEphemeralPriv
+      );
+
+      // 3) derive new RK, CKs, CKr just like ratchetStep() does
+      const info = new TextEncoder().encode("derived_keys").buffer;
+      const derived = await window.libsignal.HKDF.deriveSecrets(
+        handshakeSecret,
+        this.RK,      // salt
+        info,
+        96           // 32 bytes RK + 32 CKs + 32 CKr
+      );
+
+      // 4) pull them out
+      if (Array.isArray(derived)) {
+        [ this.RK, this.CKs, this.CKr ] = derived;
+      } else {
+        const buf = new Uint8Array(derived);
+        this.RK  = buf.slice(0,  32).buffer;
+        this.CKs = buf.slice(32, 64).buffer;
+        this.CKr = buf.slice(64, 96).buffer;
+      }
+
+      // 5) record their ratchet pub for future receive‑chain use
+      this.DHr = responderRatchetPub;
+
+      this.initialized = true;
+      return this.serialize();
     }
 }
 
