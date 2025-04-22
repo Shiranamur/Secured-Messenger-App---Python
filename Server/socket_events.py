@@ -139,7 +139,7 @@ def register_handlers(socketio):
     @socketio.on('ratchet_response')
     @jwt_required()
     def handle_ratchet_response(data):
-        sender_email = get_jwt_identity()
+        sender_email = get_jwt()["email"]
         recipient_email = data.get('to')
         ratchet_key = data.get('ratchet_key')
         if not recipient_email or not ratchet_key:

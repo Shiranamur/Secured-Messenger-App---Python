@@ -18,7 +18,7 @@ const ZERO_SALT = new Uint8Array(32).buffer;
  */
 async function setupCryptoForContact(contactEmail, communicationEndpoint) {
    try {
-    console.debug('[CRYPTO] Setting up crypto for', contactEmail, 'as', communciationEndpoint);
+    console.debug('[CRYPTO] Setting up crypto for', contactEmail, 'as', communicationEndpoint);
 
     // Load our identity key
     // 1. Fetch the contact's prekey bundle
@@ -82,7 +82,7 @@ async function setupCryptoForContact(contactEmail, communicationEndpoint) {
     throw new Error(`Invalid communication endpoint: ${communicationEndpoint}`);
   }
   catch (e) {
-    throw new Error(`Invalid communication endpoint: ${communicationEndpoint}`);
+    throw new Error(`[ContactCrypto] Error in setupCryptoForContact: ${e.message}`);
   }
 
 }
