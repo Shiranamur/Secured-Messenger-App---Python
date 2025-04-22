@@ -14,7 +14,7 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 
    Renommer `.env.example` → `.env` et adapter :
      ```env
-     DB_URI=mysql://user:password@localhost:3306/secured_messenger
+     DB_URI=mysql://user:password@localhost:3306/userdb
      SECRET_KEY=<clé secrète>
      JWT_SECRET_KEY=<clé JWT>
      PASSWORD_PEPPER=<pepper>

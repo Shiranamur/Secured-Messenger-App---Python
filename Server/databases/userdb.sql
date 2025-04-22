@@ -1,6 +1,6 @@
-CREATE DATABASE secured_messenger;
+CREATE DATABASE userdb;
 
-USE secured_messenger;
+USE userdb;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT,

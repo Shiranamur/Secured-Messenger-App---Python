@@ -94,6 +94,42 @@ function setupConnectionEvents() {
   });
 }
 
+
+//   socket.on('ephemeral_key', async (payload) => {
+//     console.log("[payload] payload " + payload)
+//     // === RECIPIENT PATH ===
+//     const ephemeralKey = payload.ephemeral_key;
+//     const ourKeyMaterial = await loadKeyMaterial();
+//     const theirSignedPreKey = payload.their_signed_prekey;
+//     const used_prekey_id = payload.prekey_id
+//
+//     try {
+//       const sharedSecret = await performX3DHasRecipient(
+//           ourKeyMaterial,
+//           payload.from,
+//           base64ToArrayBuffer(ephemeralKey)
+//       );
+//       const session = new Session(payload.from, theirSignedPreKey);
+//       await session.initializeAsInitiator(sharedSecret);
+//
+//       await saveSession(session);
+//
+//       if (used_prekey_id != null) {
+//         await deletePreKey(used_prekey_id);
+//         console.debug(`[CRYPTO] Deleted local prekey ${used_prekey_id}`);
+//       }
+//     }
+//     catch (error) {
+//       console.error('[CRYPTO] Error during X3DH recipient:', error);
+//       return;
+//     }
+//
+//
+//   });
+// }).catch(error => {
+//   console.error('[CRYPTO] Error loading socket:', error);
+// });
+
 /**
  * Setup message-related socket events
  */
