@@ -27,6 +27,9 @@ async function setupCryptoForContact(contactEmail, communciationEndpoint) {
     const theirOneTimePreKeyId = prekeyBundle.one_time_prekey?.prekey_id ?? null;
     console.log(theirOneTimePreKeyId)
 
+
+    const theirSignedPreKey = prekeyBundle.signed_prekey
+
     // 2. Load our identity key
     const ourKeyMaterial = await loadKeyMaterial();
     if (!ourKeyMaterial) {
@@ -47,11 +50,13 @@ async function setupCryptoForContact(contactEmail, communciationEndpoint) {
       // 3. Perform X3DH to establish shared secret
       const sharedSecret = await performX3DH(ourKeyMaterial, prekeyBundle, ourEphemeralKeyPair);
 
+
       // 4. Send the ephemeral key to the contact
-        await sendEphemeralKey(contactEmail, ourEphemeralKeyPair.pubKey, theirOneTimePreKeyId);
+      await sendEphemeralKey(contactEmail, ourEphemeralKeyPair.pubKey,
+            theirOneTimePreKeyId, ourKeyMaterial.signedPreKey.keyPair.pubKey) ;
 
       // 5. Initialize a Double Ratchet session as initiator
-      session = new Session(contactEmail);
+      session = new Session(contactEmail, theirSignedPreKey);
       await session.initializeAsInitiator(sharedSecret);
 
     } else {
@@ -126,8 +131,10 @@ async function fetchEphemeralKey(initiatorEmail) {
  * @param {string} contactEmail - Email of the contact
  * @param {ArrayBuffer} ephemeralKey - The ephemeral public key
  */
-async function sendEphemeralKey(contactEmail, ephemeralKey, preKeyId) {
+async function sendEphemeralKey(contactEmail, ephemeralKey, preKeyId, ourSignedPrekey) {
+  console.log("[DEBUG] entered sendEphemeralKey. parameters value :" + contactEmail, ephemeralKey, preKeyId, ourSignedPrekey)
   const ephemeralKeyBase64 = arrayBufferToBase64(ephemeralKey);
+  const ourSignedPrekeyBase64 = arrayBufferToBase64(ourSignedPrekey)
   const response = await fetch('/api/x3dh_params/ephemeral/send', {
     method: 'POST',
     credentials: 'include',
@@ -138,7 +145,8 @@ async function sendEphemeralKey(contactEmail, ephemeralKey, preKeyId) {
     body: JSON.stringify({
       recipient_email: contactEmail,
       ephemeral_key: ephemeralKeyBase64,
-      prekey_id : preKeyId
+      prekey_id : preKeyId,
+      our_signed_prekey : ourSignedPrekeyBase64
     })
   });
 
@@ -286,7 +294,7 @@ async function performX3DHasRecipient(ourKeyMaterial, theirEmail, theirEphemeral
 
 
     // 2. Calculate DH outputs - PROPERLY MIRRORED from initiator's calculations
-    // DH1: initiator uses (theirSignedPreKey, ourIdentityPrivKey)
+    // DH1: initiator uses (ourSignedPreKey, theirIdentityPrivKey)
     // Recipient should use (theirIdentityKey, ourSignedPreKeyPrivKey)
     const dh1 = await CurveHelper.calculateAgreement(
       theirIdentityKey,
@@ -356,16 +364,16 @@ function concatenateArrayBuffers(...buffers) {
 
 export { setupCryptoForContact };
 
-// After exporting everything, use dynamic import for socket
-// This ensures the module is fully loaded before accessing socket
 import('../socketHandlers.js').then(module => {
   const socket = module.socket;
 
   // Now set up the event handler
   socket.on('ephemeral_key', async (payload) => {
+    console.log("[payload] payload " + payload)
     // === RECIPIENT PATH ===
     const ephemeralKey = payload.ephemeral_key;
     const ourKeyMaterial = await loadKeyMaterial();
+    const theirSignedPreKey = payload.their_signed_prekey;
 
     try {
       const sharedSecret = await performX3DHasRecipient(
@@ -373,7 +381,7 @@ import('../socketHandlers.js').then(module => {
           payload.from,
           base64ToArrayBuffer(ephemeralKey)
       );
-      const session = new Session(payload.from);
+      const session = new Session(payload.from, theirSignedPreKey);
       await session.initializeAsInitiator(sharedSecret);
 
       await saveSession(session);

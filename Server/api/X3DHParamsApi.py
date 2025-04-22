@@ -18,6 +18,8 @@ class EphemeralKeyApi(MethodView):
         recipient_email = data.get('recipient_email')
         ephemeral_key = data.get('ephemeral_key')
         prekey_id = data.get('prekey_id')
+        signed_prekey = data.get('our_signed_prekey')
+        print("signed prekey : " + str(signed_prekey))
 
         if not recipient_email or not ephemeral_key:
             return jsonify({"error": "Missing required parameters"}), 400
@@ -27,15 +29,16 @@ class EphemeralKeyApi(MethodView):
         try:
             cursor.execute(
                 """
-                INSERT INTO x3dh_params (sender_email, recipient_email, ephemeral_key, prekey_id)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO x3dh_params (sender_email, recipient_email, ephemeral_key, prekey_id, signed_prekey)
+                VALUES (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE 
                     sender_email = %s,
                     recipient_email = %s,
                     ephemeral_key = %s,
-                    prekey_id = %s
+                    prekey_id = %s,
+                    signed_prekey = %s
                 """,
-                (sender_email, recipient_email, ephemeral_key, prekey_id, sender_email, recipient_email, ephemeral_key, prekey_id)
+                (sender_email, recipient_email, ephemeral_key, prekey_id, signed_prekey, sender_email, recipient_email, ephemeral_key, prekey_id, signed_prekey)
             )
             cnx.commit()
 
@@ -45,7 +48,8 @@ class EphemeralKeyApi(MethodView):
             if recipient_socket_id:
                 socketio.emit('ephemeral_key', {
                     'from': sender_email,
-                    'ephemeral_key': ephemeral_key
+                    'ephemeral_key': ephemeral_key,
+                    'their_signed_prekey': signed_prekey
                 }, room=recipient_socket_id)
             print(f"Ephemeral key sent to {recipient_email} from {sender_email}")
             return jsonify({"status": "success"}), 200

@@ -9,10 +9,12 @@ class Session {
      * Create a new Double Ratchet session
      * @param {string} contactEmail - Email of the contact
      * @param {string} [sessionId] - Optional session ID (generated if not provided)
+     * @param {string} contactSignedPrekey
      */
-    constructor(contactEmail, sessionId) {
+    constructor(contactEmail, contactSignedPrekey ,sessionId) {
         this.contactEmail = contactEmail;
         this.sessionId = sessionId || crypto.randomUUID();
+        this.contactSignedPrekey = contactSignedPrekey;           // contact signed_prekey
 
         // Ratchet state
         this.DHs = null;           // Our current ratchet key pair
@@ -20,6 +22,7 @@ class Session {
         this.RK = null;            // Root key
         this.CKs = null;           // Sending chain key
         this.CKr = null;           // Receiving chain key
+
         this.Ns = 0;               // # of messages in sending chain
         this.Nr = 0;               // # of messages in receiving chain
         this.PN = 0;               // # of messages in previous sending chain
@@ -116,6 +119,7 @@ class Session {
         return {
             contactEmail: this.contactEmail,
             sessionId: this.sessionId,
+            contactSignedPrekey : this.contactSignedPrekey,
             DHs: this.DHs ? {
                 pubKey: arrayBufferToBase64(this.DHs.pubKey),
                 privKey: arrayBufferToBase64(this.DHs.privKey)

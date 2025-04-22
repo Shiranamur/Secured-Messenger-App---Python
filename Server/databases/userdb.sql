@@ -15,10 +15,10 @@ CREATE TABLE users (
 
 CREATE TABLE contact_requests
 (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     requester_id INT NOT NULL,
     recipient_id INT NOT NULL,
-    status       ENUM ('pending', 'accepted', 'rejected') DEFAULT 'pending',
+    status ENUM ('pending', 'accepted', 'rejected') DEFAULT 'pending',
     created_at   TIMESTAMP                                DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (requester_id) REFERENCES users (id),
     FOREIGN KEY (recipient_id) REFERENCES users (id),
@@ -52,6 +52,7 @@ CREATE TABLE x3dh_params (
     recipient_email VARCHAR(255) NOT NULL,
     ephemeral_key VARCHAR(255) NOT NULL,
     prekey_id INT NOT NULL,
+    signed_prekey VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_email) REFERENCES users(email),
     FOREIGN KEY (recipient_email) REFERENCES users(email),
