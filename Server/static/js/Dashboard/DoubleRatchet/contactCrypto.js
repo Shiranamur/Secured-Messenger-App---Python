@@ -3,6 +3,7 @@ import { arrayBufferToBase64, base64ToArrayBuffer, loadKeyMaterial } from '../..
 import { Session } from './session.js';
 import { saveSession } from './sessionStorage.js';
 import { getCookie } from '../../utils.js';
+import {storeContact} from "../ContactStorage.js";
 
 // Constants
 const CurveHelper = window.libsignal.Curve;
@@ -358,16 +359,22 @@ import('../socketHandlers.js').then(module => {
     const ephemeralKey = payload.ephemeral_key;
     const ourKeyMaterial = await loadKeyMaterial();
 
-    const sharedSecret = await performX3DHasRecipient(
-      ourKeyMaterial,
-      payload.from,
-      base64ToArrayBuffer(ephemeralKey)
-    );
+    try {
+      const sharedSecret = await performX3DHasRecipient(
+          ourKeyMaterial,
+          payload.from,
+          base64ToArrayBuffer(ephemeralKey)
+      );
+      const session = new Session(payload.from);
+      await session.initializeAsInitiator(sharedSecret);
 
-    const session = new Session(payload.from);
-    await session.initializeAsInitiator(sharedSecret);
+      await saveSession(session);
+    }
+    catch (error) {
+      console.error('[CRYPTO] Error during X3DH recipient:', error);
+      return;
+    }
 
-    await saveSession(session);
 
   });
 }).catch(error => {
