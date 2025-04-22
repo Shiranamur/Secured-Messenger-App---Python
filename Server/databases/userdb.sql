@@ -54,5 +54,6 @@ CREATE TABLE x3dh_params (
     prekey_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sender_email) REFERENCES users(email),
-    FOREIGN KEY (recipient_email) REFERENCES users(email)
+    FOREIGN KEY (recipient_email) REFERENCES users(email),
+    UNIQUE KEY unique_request (sender_email, recipient_email)
 );

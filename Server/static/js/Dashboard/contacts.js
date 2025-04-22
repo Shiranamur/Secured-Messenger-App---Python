@@ -1,7 +1,7 @@
 ﻿// Server/static/js/Dashboard/contacts.js
 import { loadConversation } from './conversation.js';
 import { getCookie } from '../utils.js';
-import { handleContactResponse, getStoredContacts, removeContact} from './ContactStorage.js';
+import {getStoredContacts, removeContact, saveContactRequestStatus, storeContact} from './ContactStorage.js';
 
 /**
  * Sets up the contact list element with removal handler.
@@ -187,8 +187,19 @@ function handleRequestResponse(requestId, action, requesterEmail) {
         action === 'accept' ? 'accepted' :
         action === 'reject' ? 'rejected' : null
     if (responseAction) {
-      handleContactResponse(requesterEmail, responseAction);
       loadPendingRequests();
+      saveContactRequestStatus(requesterEmail, action)
+            .then(() => {
+                if (action === 'accept') {
+                storeContact(requesterEmail)
+                    .then(() => {
+                        console.debug('[CONTACT] Contact stored:', requesterEmail);
+                    })
+                    .catch(err => console.error('[CONTACT] Store error:', err));
+                }
+            })
+          .then(() => {
+          })
     } else {
       console.error('Unsupported action:', action);
     }

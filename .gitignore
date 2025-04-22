@@ -24,7 +24,6 @@ wheels/
 *.egg
 MANIFEST
 venv/
-ENV/
 env/
 .venv/
 *.log
@@ -34,7 +33,6 @@ env/
 *.iml
 *.iws
 *.ipr
-*.iws
 .idea_modules/
 out/
 

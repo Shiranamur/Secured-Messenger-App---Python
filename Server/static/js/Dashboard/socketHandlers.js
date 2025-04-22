@@ -4,7 +4,6 @@ import { appendMessage } from './conversation.js';
 import { showNotification } from '../notificationHandler.js';
 import { getCookie } from '../utils.js';
 import { dbPromise } from './db.js';
-import { setupCryptoForContact } from './DoubleRatchet/contactCrypto.js';
 import {handleContactResponse} from './ContactStorage.js';
 
 // Initialize socket connection with auth token
@@ -188,7 +187,7 @@ function setupContactEvents() {
     console.debug('[WS] Contact request response:', data.from, "with status:", data.status);
 
     try {
-      handleContactResponse(data.from, data.status)
+      handleContactResponse(data.from, data.status, 'requesting')
     }
     catch (err) {
       console.error('[WS] Failed to handle contact response:', err);

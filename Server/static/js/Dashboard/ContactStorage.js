@@ -199,8 +199,9 @@ function addContactToUI(contactEmail) {
  * Handle contact request response
  * @param {string} requesterId - Email of requester
  * @param {string} action - Whether request was accepted
+ * @param {string} communactionEndpoint - Is user receiving or requesting the request
  */
-function handleContactResponse(requesterId, action) {
+function handleContactResponse(requesterId, action, communactionEndpoint) {
 
   // Remove notification from UI
   removeContactRequestNotification(requesterId);
@@ -215,7 +216,7 @@ function handleContactResponse(requesterId, action) {
             console.debug('[CONTACT] Accepted new contact:', requesterId);
 
             // Setup crypto for the new contact
-            return setupCryptoForContact(requesterId)
+            return setupCryptoForContact(requesterId, communactionEndpoint)
               .then(() => storeContact(requesterId))
               .catch(err => {
                 console.error('[CRYPTO] Setup failed:', err);

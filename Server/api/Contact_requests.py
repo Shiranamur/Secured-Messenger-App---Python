@@ -35,8 +35,12 @@ class ContactRequestsView(MethodView):
         user_id = get_jwt_identity()
         action = request.json.get('action')
 
+
         if action not in ['accept', 'reject']:
             return jsonify({'status': 'error', 'message': 'Invalid action'}), 400
+
+        status_mapping = {'accept': 'accepted', 'reject': 'rejected'}
+        status = status_mapping[action]
 
         cnx = get_db_cnx()
         cursor = cnx.cursor(dictionary=True)
@@ -49,12 +53,6 @@ class ContactRequestsView(MethodView):
             req = cursor.fetchone()
             if not req:
                 return jsonify({'status': 'error', 'message': 'Request not found'}), 404
-
-            print('setting status of the request_id ', request_id, 'to ', action)
-            if action == 'accept':
-                status = 'accepted'
-            else:
-                return jsonify({'status': 'error', 'message': 'Invalid action'}), 400
 
             cursor.execute(
                 "UPDATE contact_requests SET status = %s WHERE id = %s",
