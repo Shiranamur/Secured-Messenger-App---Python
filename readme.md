@@ -100,7 +100,7 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 - Ulysse : développement des routes API, sécurité (PBKDF2 + salt/pepper), JWT, CSRF, transmission des pré‑keys et signed_prekey, stockage local des messages.
 
 
-![]https://github.com/Shiranamur/Secured-Messenger-App---Python/main/Ressources/kanban_messenger_app.png)
+![](https://github.com/Shiranamur/Secured-Messenger-App---Python/blob/main/Ressources/kanban_messenger_app.png)
 
 ---
 
