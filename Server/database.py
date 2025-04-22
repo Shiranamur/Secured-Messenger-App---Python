@@ -90,7 +90,6 @@ def messaging_waiting(user_email, contact_email):
 
 def mark_messages_as_read_in_db(user_email, contact_email):
     """Met à jour le statut 'is_read' des messages reçus."""
-    print("wtf")
     cnx = get_db_cnx()
     cursor = cnx.cursor()
     try:
