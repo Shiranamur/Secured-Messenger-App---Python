@@ -2,7 +2,7 @@
 import { socket } from './socketHandlers.js';
 import { appendMessage } from './conversation.js';
 import { saveMessage } from './db.js';
-import { dbPromise } from './db.js';
+import {getSessionByContact} from "./DoubleRatchet/sessionStorage.js";
 
 /**
  * Send a message via WebSocket
@@ -31,9 +31,16 @@ async function sendMessageViaSocket() {
 
     // Send message via socket
     console.debug('[MSG] Sending message to', window.currentContactEmail);
+    const session = await getSessionByContact(window.currentContactEmail);
+    if (!session) {
+      console.warn('[MSG] No session found for contact:', window.currentContactEmail);
+      return;
+    }
+    console.log('[MSG] Session:', session);
+    const ciphertext = await session.encrypt(sanitizedText);
     socket.emit('send_message', {
       receiver: window.currentContactEmail,
-      ciphertext: sanitizedText,
+      ciphertext: ciphertext,
       msg_type: 'message'
     });
 

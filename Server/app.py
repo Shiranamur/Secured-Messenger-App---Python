@@ -3,8 +3,8 @@ from flask import render_template
 from flask_jwt_extended import JWTManager
 from flask_wtf import CSRFProtect
 from Server.socket_manager import socketio, init_socketio
-from .web import auth_bp, home_bp
-from .api import api_bp
+from web import auth_bp, home_bp
+from api import api_bp
 import os
 from dotenv import load_dotenv
 
