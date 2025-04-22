@@ -23,6 +23,7 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 3. **Base de données**
 - Windows
    ```bash
+   cd .\Secured-Messenger-App---Python\
    Get-Content Server\databases\userdb.sql | mysql -u root -p
    ```
 - Linux/Mac 
@@ -32,14 +33,12 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 4. **Environnement virtuel & dépendances**
 - Windows
    ```bash
-   cd .\Secured-Messenger-App---Python\
    py -3 -m venv .venv
    .venv\Scripts\activate  
    pip install -r requirements.txt
    ```
 - Linux/Mac 
    ```bash
-   cd .\Secured-Messenger-App---Python\
    python3 -m venv .venv
    . .venv/bin/activate
    pip install -r requirements.txt
