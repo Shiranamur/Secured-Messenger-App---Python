@@ -23,7 +23,7 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 3. **Base de données**
 
    ```bash
-   mysql -u root -p < scripts/setup_db.sql
+   Get-Content Server\databases\userdb.sql | mysql -u root -p
    ```
 
 4. **Environnement virtuel & dépendances**
