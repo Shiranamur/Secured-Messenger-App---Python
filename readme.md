@@ -30,7 +30,7 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
   mysql -u root -p < Server/databases/userdb.sql
   ```
 4. **Environnement virtuel & dépendances**
--Windows
+- Windows
    ```bash
    cd .\Secured-Messenger-App---Python\
    py -3 -m venv .venv
