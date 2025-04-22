@@ -106,35 +106,36 @@ def register_handlers(socketio):
         finally:
             if cnx: cnx.close()
 
-    @jwt_required()
-    @socketio.on('load_undelivered_messages')
-    def handle_load_undelivered_messages(data):
-        verify_jwt_in_request()
-        user_email = get_jwt()["email"]
-        contact_email = data.get("contact_email")
-
-        if not contact_email:
-            emit('error', {"error": "Contact email is missing"})
-            return
-        undelivered_messages = messaging_waiting(user_email, contact_email)
-
-        if undelivered_messages:
-            emit('messages_load', {"messages": undelivered_messages})
-        else:
-            emit('error', {"error": "No undelivered messages found"})
-
-    @jwt_required()
-    @socketio.on('mark_messages_as_read')
-    def handle_mark_messages_as_read(data):
-        print("read")
-        verify_jwt_in_request()
-        user_email = get_jwt()["email"]
-        contact_email = data.get("contact_email")
-
-        if not contact_email:
-            emit('error', {"error": "Contact email is missing"})
-            return
-        mark_messages_as_read_in_db(user_email, contact_email)
+    # todo remove the comments
+    # @jwt_required()
+    # @socketio.on('load_undelivered_messages')
+    # def handle_load_undelivered_messages(data):
+    #     verify_jwt_in_request()
+    #     user_email = get_jwt()["email"]
+    #     contact_email = data.get("contact_email")
+    #
+    #     if not contact_email:
+    #         emit('error', {"error": "Contact email is missing"})
+    #         return
+    #     undelivered_messages = messaging_waiting(user_email, contact_email)
+    #
+    #     if undelivered_messages:
+    #         emit('messages_load', {"messages": undelivered_messages})
+    #     else:
+    #         emit('error', {"error": "No undelivered messages found"})
+    #
+    # @jwt_required()
+    # @socketio.on('mark_messages_as_read')
+    # def handle_mark_messages_as_read(data):
+    #     print("read")
+    #     verify_jwt_in_request()
+    #     user_email = get_jwt()["email"]
+    #     contact_email = data.get("contact_email")
+    #
+    #     if not contact_email:
+    #         emit('error', {"error": "Contact email is missing"})
+    #         return
+    #     mark_messages_as_read_in_db(user_email, contact_email)
 
     @socketio.on('ratchet_response')
     @jwt_required()

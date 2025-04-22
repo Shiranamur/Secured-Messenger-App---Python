@@ -139,11 +139,6 @@ async function sendEphemeralKey(contactEmail, ephemeralKey, preKeyId) {
 }
 
 /**
- * 3. socketHandlers.js (Responder path)
- *  socketHandlers.js (Responder path)
- */
-
-/**
  * Fetch another user's identity key
  * @param {string} email - The user's email
  * @returns {Promise<ArrayBuffer>} - Their identity key

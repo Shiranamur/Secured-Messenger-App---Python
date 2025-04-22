@@ -101,14 +101,24 @@ function setupMessageEvents() {
   // todo messages !
 
   // generic message handler
-  socket.on('message', async (msg) => {
+socket.on('message', async (msg) => {
+  try {
+    // 1) load or create the live session object
     const session = await getSessionByContact(msg.from);
-    if (!session.initialized) {
-      pending.push(msg);
-    } else {
-      await handleMessage(msg, session);
-    }
-  });
+
+    // 2) decrypt the ciphertext
+    const text = await session.decrypt(msg.ciphertext);
+
+    // 3) persist the mutated session (so we don’t ratchet twice)
+    await saveSession(session);
+
+    // 4) show / store the plaintext
+    appendMessage(text, 'incoming');
+    // … optionally send delivery receipt …
+  } catch (err) {
+    console.error('[WS] Failed to decrypt incoming message:', err);
+  }
+});
 
   socket.on('message_sent', async ({ id }) => {
     console.debug('[WS] Message sent with ID:', id);

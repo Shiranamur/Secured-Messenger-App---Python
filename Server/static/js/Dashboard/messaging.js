@@ -2,64 +2,66 @@
 import { socket } from './socketHandlers.js';
 import { appendMessage } from './conversation.js';
 import { saveMessage } from './db.js';
-import {getSessionByContact} from "./DoubleRatchet/sessionStorage.js";
+import {getSessionByContact, saveSession} from "./DoubleRatchet/sessionStorage.js";
 
 /**
  * Send a message via WebSocket
  * @returns {Promise<void>}
  */
 async function sendMessageViaSocket() {
-  // Check if a contact is selected
   if (!window.currentContactEmail) {
     console.warn('[MSG] No contact selected');
     return;
   }
 
-  // Get message text
-  const newMsgInput = document.getElementById('new-message');
-  const plaintext = newMsgInput.value.trim();
+  const input = document.getElementById('new-message');
+  const plaintext = input.value.trim();
   if (!plaintext) {
     console.warn('[MSG] Empty input, nothing sent');
     return;
   }
 
   try {
-    // Sanitize message text
-    const tempDiv = document.createElement('div');
-    tempDiv.textContent = plaintext;
-    const sanitizedText = tempDiv.textContent;
-
-    // Send message via socket
-    console.debug('[MSG] Sending message to', window.currentContactEmail);
+    // 1) Load your live session
     const session = await getSessionByContact(window.currentContactEmail);
     if (!session) {
-      console.warn('[MSG] No session found for contact:', window.currentContactEmail);
+      console.warn('[MSG] No session for', window.currentContactEmail);
       return;
     }
-    console.log('[MSG] Session:', session);
-    const ciphertext = await session.encrypt(sanitizedText);
+
+    // 2) Encrypt the clean plaintext
+    const safeText = (() => {
+      const d = document.createElement('div');
+      d.textContent = plaintext;
+      return d.textContent;
+    })();
+    const ciphertext = await session.encrypt(safeText);
+
+    // 3) Persist the ratchet state so CKs/Ns advance
+    await saveSession(session);
+
+    // 4) Send to the server
     socket.emit('send_message', {
-      receiver: window.currentContactEmail,
-      ciphertext: ciphertext,
-      msg_type: 'message'
+      receiver:  window.currentContactEmail,
+      ciphertext,
+      msg_type:  'message'
     });
 
-    // Save message to local storage
+    // 5) Store the plaintext locally (so you can always display it,
+    //    even if you lose your keys and can’t decrypt later)
     await saveMessage({
       contactEmail: window.currentContactEmail,
-      ciphertext: sanitizedText,
-      direction: 'outgoing',
-      timestamp: Date.now()
+      plaintext:    safeText,     // <-- store the clear‑text
+      direction:    'outgoing',
+      timestamp:    Date.now()
     });
 
-    // Display message in conversation
-    appendMessage(sanitizedText, 'outgoing');
+    // 6) Show it in the UI
+    appendMessage(safeText, 'outgoing');
+    input.value = '';
 
-    // Clear input
-    newMsgInput.value = '';
-
-  } catch (error) {
-    console.error('[MSG] Error sending message:', error);
+  } catch (err) {
+    console.error('[MSG] Error sending message:', err);
   }
 }
 

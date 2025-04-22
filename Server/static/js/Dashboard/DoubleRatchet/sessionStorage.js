@@ -7,6 +7,7 @@
  const SESSION_STORE_NAME = 'double-ratchet-sessions';
  const DB_NAME = 'SessionsDB';
  const DB_VERSION = 1;
+ const sessionCache = new Map();
 
  /**
   * Open the sessions database
@@ -36,28 +37,30 @@ function initSessionsDB() {
   * @param {Session} session - Session to save
   * @returns {Promise<void>}
   */
- async function saveSession(session) {
-   if (!session || !session.contactEmail) {
-     throw new Error('Invalid session object');
-   }
+async function saveSession(session) {
+  if (!session || !session.contactEmail) {
+    throw new Error('Invalid session object');
+  }
+  sessionCache.set(session.contactEmail, session);
+  const serializedSession = session.serialize();
 
-   try {
-     const db = await initSessionsDB();
-     const tx = db.transaction([SESSION_STORE_NAME], 'readwrite');
-     const store = tx.objectStore(SESSION_STORE_NAME);
+  try {
+    const db = await initSessionsDB();
+    const tx = db.transaction([SESSION_STORE_NAME], 'readwrite');
+    const store = tx.objectStore(SESSION_STORE_NAME);
 
-     await new Promise((resolve, reject) => {
-       const request = store.put(session.serialize());
-       request.onsuccess = resolve;
-       request.onerror = (event) => reject(event.target.error);
-     });
+    await new Promise((resolve, reject) => {
+      const request = store.put(serializedSession);
+      request.onsuccess = resolve;
+      request.onerror = (event) => reject(event.target.error);
+    });
 
-     console.debug(`[SESSION] Saved session for ${session.contactEmail}`);
-   } catch (error) {
-     console.error('[SESSION] Error saving session:', error);
-     throw error;
-   }
- }
+    console.debug(`[SESSION] Saved session for ${session.contactEmail}`);
+  } catch (error) {
+    console.error('[SESSION] Error saving session:', error);
+    throw error;
+  }
+}
 
  /**
   * Get a session for a contact
@@ -65,6 +68,9 @@ function initSessionsDB() {
   * @returns {Promise<Session|null>} - Session object or null if not found
   */
 async function getSessionByContact(contactEmail) {
+  if (sessionCache.has(contactEmail)) {
+    return sessionCache.get(contactEmail);
+  }
   try {
     const db = await initSessionsDB();
     const tx = db.transaction([SESSION_STORE_NAME], 'readonly');
@@ -75,7 +81,9 @@ async function getSessionByContact(contactEmail) {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => {
         if (request.result) {
-          resolve(deserializeSession(request.result));
+          const session = deserializeSession(request.result);
+          sessionCache.set(contactEmail, session);
+          resolve(session);
         } else {
           resolve(null);
         }
