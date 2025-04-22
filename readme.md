@@ -48,39 +48,50 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 - **Analyse des besoins**  
   Recensement des exigences fonctionnelles et non-fonctionnelles (E2EE, authentification JWT, communication en temps réel, gestion des clés).
 
+
 - **Conception**  
   Modélisation de l’architecture client-serveur, élaboration des diagrammes de séquence X3DH et de déploiement.
 
+
 - **Implémentation backend**  
-  - Développement des API REST (Flask, JWT, CSRF)  
+  - Développement de l'API REST (Flask, JWT, CSRF)  
   - Conception du schéma relationnel (MySQL/MariaDB)  
+
 
 - **Implémentation frontend**  
   - Interface web en JavaScript (vanilla) et Socket.IO-client  
   - Interaction avec IndexedDB et LibSignal JS
-  - Intégration du stockage local IndexedDB (clés privées)
+  - Intégration du stockage local IndexedDB (DH Keys, contact, contact request, sessions, messages)
+
 
 - **Cryptographie avancée**  
   - Recherche et intégration du protocole X3DH  
   - Mise en œuvre de l’algorithme Double Ratchet pour chaque message
 
+
 - **Tests et validation**  
   Mise en place de tests d'intégration
+
 
 - **Présentations et documentation**  
   Production du README détaillé, des slides pour l’oral et du tableau Kanban.
 
 ---
 
-### Répartition & estimations
+## Répartition & estimations
 
-- Backend « classique » (API REST, schéma BD, chiffrement des mots de passe) : ~5 h‑homme
+- Backend « classique » (API REST, schéma BD, chiffrement des mots de passe) : ~10 h‑Homme
 
-- Frontend prototype non chiffré (interface JS, stockage IndexedDB initial) : ~5 h‑homme
 
-- Cryptographie X3DH & Double Ratchet : ~5 jours‑homme
+- Frontend prototype non chiffré (interface JS, stockage IndexedDB initial) : ~10 h‑Homme
 
-- Répartition informelle :
+
+- Cryptographie X3DH & Double Ratchet : ~7 jours‑Homme
+
+
+- Tests d'intégration, vérification du bon fonctionnement de l'application ~10 h‑Homme
+
+**Répartition informelle :**
 
 - Léo : gestion des contacts, livraison des messages via WebSocket, base de données initiale, tests et débogage.
 
@@ -88,25 +99,30 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 
 - Ulysse : développement des routes API, sécurité (PBKDF2 + salt/pepper), JWT, CSRF, transmission des pré‑keys et signed_prekey, stockage local des messages.
 
-- **insérer Kanban**
+
+![]https://github.com/Shiranamur/Secured-Messenger-App---Python/main/Ressources/kanban_messenger_app.png)
 
 ---
-.
+
 ## Choix technologiques
 
 - **LibSignal JS**  
-  Unique implémentation récente du protocole Signal, intégrée côté client pour X3DH et Double Ratchet.
+  Implémentation récente du protocole Signal, intégrée côté client pour X3DH, Double Ratchet, création de clés.
+
 
 - **Flask + Flask-SocketIO**  
   API REST et WebSockets unifiés, support natif du WebSocket.
 
+
 - **MySQL/MariaDB**  
   Base relationnelle pour métadonnées et clés publiques.
+
 
 - **IndexedDB**  
   Persistance locale sécurisée des clés privées et des messages en transit.
 
-- **JWT (Flask-JWT-Extended)**  
+
+- **JWT (Flask-JWT-Extended, Flask-WTF)**  
   Gestion des tokens d’accès et de rafraîchissement avec protection CSRF.
 
 ---
@@ -206,7 +222,7 @@ Stocke les paramètres d'établissement initial de session via le protocole X3DH
 - `signalKeys`  
   Clés privée/publique de l’utilisateur
 - `signalSessions`  
-  Données de session Double Ratchet (rootKey, chain keys, counters)
+  Données de session Double Ratchet (rootKey, chain keys, counters, alt user signed prekey)
 
 ---
 
@@ -215,15 +231,19 @@ Stocke les paramètres d'établissement initial de session via le protocole X3DH
 - **Gestion des mots de passe**  
   PBKDF2‑HMAC‑SHA256, salt unique + pepper (variable d’environnement).
 
+
 - **Authentification**  
   JWT stockés en cookies HTTPOnly, rotation des tokens, protection CSRF.
+
 
 - **Chiffrement E2EE**  
   - Protocole X3DH pour l’établissement de la session initiale  
   - Algorithme Double Ratchet pour confidentialité persistante et forward secrecy
 
+
 - **Sécurité WebSocket**  
   Authentification lors de la connexion Socket.IO, renégociation périodique des clés.
+
 
 - **Contre‑attaques**  
   Salt + pepper pour contrer les rainbow tables, validation stricte des entrées, gestion des erreurs.
@@ -232,20 +252,20 @@ Stocke les paramètres d'établissement initial de session via le protocole X3DH
 
 ## API REST
 
-| Route                                    | Méthode | Payload                                        | Succès (code & réponse)                                                                                  | Erreurs principales (code)                         |
-| ---------------------------------------- | ------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `/api/x3dh_params/ephemeral/send`        | POST    | `{ recipient_email, ephemeral_key, prekey_id, our_signed_prekey }` | **200** `{ "status": "success" }`                                                                          | 400 paramètres manquants<br>500 erreur BD           |
-| `/api/x3dh_params/ephemeral/retrieve`    | POST    | `{ sender_email }`                              | **200** `{ "status": "success", "ephemeral_key": string, "prekey_id": number }`                            | 400 paramètre manquant<br>404 non trouvé<br>500 erreur BD |
-| `/api/identity_key`                      | POST    | `{ email }`                                     | **200** `{ "identity_key": string }`                                                                       | 400 paramètre manquant<br>404 utilisateur<br>500 erreur BD |
-| `/api/keys`                              | POST    | `{ contact_email }`                             | **200** `{ identity_public_key, signed_prekey, signed_prekey_signature, one_time_prekey }`                 | 400 paramètre manquant<br>404 utilisateur<br>500 erreur BD |
-| `/api/contact-requests`                  | GET     | —                                               | **200** `{ "requests": [ { id, requester_email, created_at }, … ] }`                                       | —                                                  |
-| `/api/contact-requests/<request_id>`     | PUT     | `{ action }` où action ∈ ["accept","reject"]     | **200** `{ "status": "success", "message": "Request accepted/rejected" }`                                  | 400 action invalide<br>404 requête non trouvée      |
-| `/api/prekeys/count`                     | GET     | —                                               | **200** `{ "count": <nombre_de_prekeys_non_utilisées> }`                                                  | —                                                  |
-| `/api/refreshpks`                        | POST    | `{ prekeys: [ { prekey_id, prekey }, … ] }`     | **201** `{ "status": "success", "message": "prekeys refreshed" }`                                          | 400 payload invalide                               |
-| `/api/contact` (envoi)                   | POST    | Form `user2` (email de l’utilisateur à ajouter) | **200** `{ "status": "success", "message": "Contact request sent successfully", "userEmail": string }`    | 404 utilisateur inexistant<br>409 auto-ajout        |
-| `/api/contact` (suppression)             | DELETE  | Form `emailToRemove` (email à supprimer)        | **200** `{ "status": "success", "message": "Contact removed successfully", "userEmail": string }`         | 404 utilisateur inexistant                         |
-| `/login`                                 | POST    | Form `email, password`                          | **302** Redirect vers `/home/dashboard` + Set-Cookie: access_token                                         | 401 Mot de passe ou email invalide                 |
-| `/register`                              | POST    | Form `email, password, identity public key, signed prekey, signed prekey signature, prekeys` | **302** Redirect vers `/` & flash message "Registration successful"                         | 400 Validation errors & redirect vers `/`           |
+| Route                                    | Méthode | Payload                                        | Succès (code & réponse)                                                                                  | Erreurs principales (code)                 |
+| ---------------------------------------- | ------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |--------------------------------------------|
+| `/api/x3dh_params/ephemeral/send`        | POST    | `{ recipient_email, ephemeral_key, prekey_id, our_signed_prekey }` | **200** `{ "status": "success" }`                                                                          | 400 paramètres manquants<br>500 erreur BD  |
+| `/api/x3dh_params/ephemeral/retrieve`    | POST    | `{ sender_email }`                              | **200** `{ "status": "success", "ephemeral_key": string, "prekey_id": number }`                            | 400 paramètre manquant<br>500 erreur BD    |
+| `/api/identity_key`                      | POST    | `{ email }`                                     | **200** `{ "identity_key": string }`                                                                       | 400 paramètre manquant<br>500 erreur BD    |
+| `/api/keys`                              | POST    | `{ contact_email }`                             | **200** `{ identity_public_key, signed_prekey, signed_prekey_signature, one_time_prekey }`                 | 400 paramètre manquantr<br>500 erreur BD   |
+| `/api/contact-requests`                  | GET     | —                                               | **200** `{ "requests": [ { id, requester_email, created_at }, … ] }`                                       | —                                          |
+| `/api/contact-requests/<request_id>`     | PUT     | `{ action }` où action ∈ ["accept","reject"]     | **200** `{ "status": "success", "message": "Request accepted/rejected" }`                                  | 400 action invalide<br>                    |
+| `/api/prekeys/count`                     | GET     | —                                               | **200** `{ "count": <nombre_de_prekeys_non_utilisées> }`                                                  | —                                          |
+| `/api/refreshpks`                        | POST    | `{ prekeys: [ { prekey_id, prekey }, … ] }`     | **201** `{ "status": "success", "message": "prekeys refreshed" }`                                          | 400 payload invalide                       |
+| `/api/contact` (envoi)                   | POST    | Form `user2` (email de l’utilisateur à ajouter) | **200** `{ "status": "success", "message": "Contact request sent successfully", "userEmail": string }`    | 404 utilisateur inexistant<br>409 self-add |
+| `/api/contact` (suppression)             | DELETE  | Form `emailToRemove` (email à supprimer)        | **200** `{ "status": "success", "message": "Contact removed successfully", "userEmail": string }`         | 404 utilisateur inexistant                 |
+| `/login`                                 | POST    | Form `email, password`                          | **302** Redirect vers `/home/dashboard` + Set-Cookie: access_token                                         | 401 Mot de passe ou email invalide         |
+| `/register`                              | POST    | Form `email, password, identity public key, signed prekey, signed prekey signature, prekeys` | **302** Redirect vers `/` & flash message "Registration successful"                         | 400 Validation errors & redirect vers `/`  |
 
 ---
 
@@ -258,6 +278,14 @@ Stocke les paramètres d'établissement initial de session via le protocole X3DH
 
 ## Fonctionnalité additionnelle
 
-- **Double Ratchet** (algorithme à double cliquet) : assure forward secrecy et sécurité post‑compromission.
+**Fonctionnalité additionnelle : Double Ratchet (3DH)**
+
+- Forward Secrecy – Chaque message utilise une clé éphémère renouvelée : en cas de compromission ultérieure, les échanges précédents restent inaccessibles.
+
+- Post‑Compromise Security – Si une clé est volée, le ratchet restaure automatiquement la confidentialité dès l’envoi suivant, limitant la fenêtre d’exposition.
+
+- Choix du 3DH vs 4DH – Plus simple à implémenter et à auditer, couvre tous les cas d’usage (initiation, asynchrone, reconnexion) sans retarder le projet.
+
+- Compatibilité WebSocket – Les messages restent chiffrés en base et, à la reconnexion, sont traités dans l’ordre des ratchets pour garantir intégrité et confidentialité quel que soit l’état de connexion.
 
 ---
