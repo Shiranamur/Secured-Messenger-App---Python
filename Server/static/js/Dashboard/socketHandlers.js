@@ -4,15 +4,19 @@ import { appendMessage } from './conversation.js';
 import { showNotification } from '../notificationHandler.js';
 import { getCookie } from '../utils.js';
 import { dbPromise } from './db.js';
-import {handleContactResponse} from './ContactStorage.js';
+import { handleContactResponse } from './ContactStorage.js';
+import {getSessionByContact, saveSession} from "./DoubleRatchet/sessionStorage.js";
+import { performX3DHasRecipient } from "./DoubleRatchet/contactCrypto.js";
+import {arrayBufferToBase64, base64ToArrayBuffer, deletePreKey, getPreKey, loadKeyMaterial} from "../KeyStorage.js";
+import {Session} from "./DoubleRatchet/session.js";
 
 // Initialize socket connection with auth token
 const socket = io('/', {
-  extraHeaders: {
-    'Authorization': `Bearer ${getCookie('access_token_cookie')}`
-  }
+  extraHeaders: { 'Authorization': `Bearer ${getCookie('access_token_cookie')}` }
 });
 
+// to store pending messages until the session is initialized
+let pending = [];
 /**
  * Setup all socket event handlers
  */
@@ -54,47 +58,56 @@ function setupConnectionEvents() {
     console.debug('[WS] Reconnected');
     document.querySelector('.connection-status')?.remove();
   });
+
+  socket.on('ephemeral_key', async ({from, ephemeral_key, prekey_id}) => {
+    // decode and derive X3DH secret
+    const theirRatchetKey = base64ToArrayBuffer(ephemeral_key);
+
+    // load our keys…
+    const ourKeyMaterial = await loadKeyMaterial();
+    const oneTimePreKey = await getPreKey(prekey_id);
+
+    // derive the secret
+    const sharedSecret = await performX3DHasRecipient(
+        ourKeyMaterial,
+        from,
+        theirRatchetKey,
+        oneTimePreKey
+    );
+
+    // one-shot responder init
+    const session = new Session(from);
+    await session.initializeAsResponder(sharedSecret, theirRatchetKey);
+    await deletePreKey(prekey_id);
+    await saveSession(session);
+
+    console.log('[WS] Emitting ratchet response to:', from);
+    // send back our ephemeral
+    socket.emit('ratchet_response', {
+      to: from,
+      ratchet_key: arrayBufferToBase64(session.DHs.pubKey)
+    });
+
+    // replay any pending inbound messages
+    pending.forEach(handleMessage);
+    pending = [];
+  });
 }
 
 /**
  * Setup message-related socket events
  */
 function setupMessageEvents() {
-  socket.on('message', async (payload) => {
-    console.debug('[WS] Received message event', payload);
-    const {from, ciphertext, id} = payload;
+  // todo messages !
 
-    // Ignore messages not for current contact
-    if (from !== window.currentContactEmail) {
-      console.debug('[WS] Message is for another contact, ignoring');
-      return;
+  // generic message handler
+  socket.on('message', async (msg) => {
+    const session = await getSessionByContact(msg.from);
+    if (!session.initialized) {
+      pending.push(msg);
+    } else {
+      await handleMessage(msg, session);
     }
-
-    // Display message
-    appendMessage(ciphertext, 'incoming');
-
-    // Store message in IndexedDB
-    try {
-      const db = await dbPromise;
-      const tx = db.transaction('messages', 'readwrite');
-      tx.objectStore('messages').add({
-        serverMessageId: id,
-        contactEmail: from,
-        ciphertext,
-        direction: 'incoming',
-        timestamp: Date.now(),
-        readFlag: false
-      });
-      await tx.complete;
-    } catch (e) {
-      console.error('[DB] Failed to save incoming message', e);
-    }
-
-    // Send delivery confirmation
-    socket.emit('message_received', {
-      messageId: id,
-      sender: from
-    });
   });
 
   socket.on('message_sent', async ({ id }) => {
@@ -140,7 +153,6 @@ function setupMessageEvents() {
     socket.on('mark_messages_as_read', ({ contact_email }) => {
       console.debug(`[WS] Messages marked as read for ${contact_email}`);
     });
-
 }
 
 /**
@@ -200,6 +212,40 @@ function setupContactEvents() {
       showNotification(`${data.from} rejected your contact request`);
     }
   });
+}
+
+
+async function handleMessage(msg, session) {
+  const { header, ciphertext, iv, mac } = msg.ciphertext;
+  try {
+    const text = await session.decrypt({ header, ciphertext, iv, mac });
+    appendMessage(text, 'incoming');
+
+    // Store message in IndexedDB
+    try {
+      const db = await dbPromise;
+      const tx = db.transaction('messages', 'readwrite');
+      tx.objectStore('messages').add({
+        serverMessageId: msg.id,
+        contactEmail: msg.from,
+        ciphertext,
+        direction: 'incoming',
+        timestamp: Date.now(),
+        readFlag: false
+      });
+      await tx.complete;
+    } catch (e) {
+      console.error('[DB] Failed to save incoming message', e);
+    }
+
+    // Send delivery confirmation
+    socket.emit('message_received', {
+      messageId: msg.id,
+      sender: msg.from
+    });
+  } catch (err) {
+    console.warn('Failed to decrypt incoming message:', err);
+  }
 }
 
 export { socket, setupSocketHandlers };

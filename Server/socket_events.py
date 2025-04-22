@@ -1,12 +1,14 @@
 ﻿from flask import request
-from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
+from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity, jwt_required
 from flask_socketio import join_room, emit
 from Server.database import get_db_cnx, get_id_from_email, messaging_waiting, mark_messages_as_read_in_db
-
+import json
 
 user_sessions = {} # Dictionary to store user sessions
 
 def register_handlers(socketio):
+
+    @jwt_required()
     @socketio.on('connect')
     def handle_connect():
         verify_jwt_in_request()
@@ -15,6 +17,7 @@ def register_handlers(socketio):
         join_room(user_id_str)
         print(f"User {user_id_str} connected with socket ID {request.sid}")
 
+    @jwt_required()
     @socketio.on('disconnect')
     def handle_disconnect():
         # Remove user from tracking
@@ -23,6 +26,7 @@ def register_handlers(socketio):
                 del user_sessions[user_id]
                 break
 
+    @jwt_required()
     @socketio.on('send_message')
     def handle_send_message(data):
         verify_jwt_in_request()
@@ -31,8 +35,10 @@ def register_handlers(socketio):
         print(f"Sender email: {sender_email} - {request.sid} - {data}")
 
         receiver_email = data.get("receiver")
-        text = data.get("ciphertext")
+        encrypted_data = data.get("ciphertext")  # This is now a complex object
         msg_type = data.get("msg_type", "message")
+
+        encrypted_json = json.dumps(encrypted_data)
 
         cnx = None
         cur = None
@@ -42,32 +48,39 @@ def register_handlers(socketio):
             cur.execute(
                 "INSERT INTO messages (sender_email, receiver_email, content)"
                 " VALUES (%s, %s, %s)",
-                (sender_email, receiver_email, text)
+                (sender_email, receiver_email, encrypted_json)
             )
             cnx.commit()
             message_id = cur.lastrowid
-            print(f"Message ID: {message_id} trying to send to : {receiver_email}")
-            # Push to receiver if online
+            print(f"Message id: {message_id} trying to send to : {receiver_email}")
+
+            # Notify recipient through socket
             socketio.emit('message', {
                 "from": sender_email,
-                "ciphertext": text,
+                "ciphertext": encrypted_data,  # Preserve the original structure
                 "msg_type": msg_type,
                 "id": message_id
             }, room=get_user_socket_id(get_id_from_email(receiver_email)))
 
-            # Acknowledge successful send
-            emit('message_sent', {"status": "sent", "id": message_id})
-
+            # Acknowledge successful message sending
+            emit('message_sent', {
+                "status": "success",
+                "messageId": message_id
+            })
         except Exception as e:
-            if cnx: cnx.rollback()
-            print(e)
-            emit('error', {"error": "Failed to send message"})
+            if cnx:
+                cnx.rollback()
+            print(f"Error sending message: {e}")
+            emit('message_sent', {
+                'status': 'error',
+                'error': str(e)
+            })
         finally:
             if cur: cur.close()
             if cnx: cnx.close()
 
-
     # socket_events.py - Add this new handler
+    @jwt_required()
     @socketio.on('message_received')
     def handle_message_received(data):
         message_id = data.get("messageId")
@@ -93,6 +106,7 @@ def register_handlers(socketio):
         finally:
             if cnx: cnx.close()
 
+    @jwt_required()
     @socketio.on('load_undelivered_messages')
     def handle_load_undelivered_messages(data):
         verify_jwt_in_request()
@@ -109,6 +123,7 @@ def register_handlers(socketio):
         else:
             emit('error', {"error": "No undelivered messages found"})
 
+    @jwt_required()
     @socketio.on('mark_messages_as_read')
     def handle_mark_messages_as_read(data):
         print("read")
@@ -121,6 +136,24 @@ def register_handlers(socketio):
             return
         mark_messages_as_read_in_db(user_email, contact_email)
 
+    @socketio.on('ratchet_response')
+    @jwt_required()
+    def handle_ratchet_response(data):
+        sender_email = get_jwt_identity()
+        recipient_email = data.get('to')
+        ratchet_key = data.get('ratchet_key')
+        if not recipient_email or not ratchet_key:
+            return
+        print('ratchet_response', data)
+
+        recipient_id = get_id_from_email(recipient_email)
+        recipient_socket_id = get_user_socket_id(recipient_id)
+        if recipient_socket_id:
+            socketio.emit(
+                'ratchet_response',
+                {'from': sender_email, 'ratchet_key': ratchet_key},
+                room=recipient_socket_id
+            )
 
 def get_user_socket_id(user_id):
     return user_sessions.get(str(user_id))
