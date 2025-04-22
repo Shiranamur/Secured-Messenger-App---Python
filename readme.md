@@ -29,8 +29,8 @@ Ce projet académique a pour objectif la conception et le prototypage d’une ap
 4. **Environnement virtuel & dépendances**
 
    ```bash
-   python -m venv .venv  
-   source .venv/bin/activate  
+   py -3 -m venv .venv
+   .venv\Scripts\activate  
    pip install -r requirements.txt
    ```
 
