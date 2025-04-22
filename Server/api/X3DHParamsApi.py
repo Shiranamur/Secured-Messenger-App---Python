@@ -49,7 +49,8 @@ class EphemeralKeyApi(MethodView):
                 socketio.emit('ephemeral_key', {
                     'from': sender_email,
                     'ephemeral_key': ephemeral_key,
-                    'their_signed_prekey': signed_prekey
+                    'their_signed_prekey': signed_prekey,
+                    'prekey_id': prekey_id
                 }, room=recipient_socket_id)
             print(f"Ephemeral key sent to {recipient_email} from {sender_email}")
             return jsonify({"status": "success"}), 200
