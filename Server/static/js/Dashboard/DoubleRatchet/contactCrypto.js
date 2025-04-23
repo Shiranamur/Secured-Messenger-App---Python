@@ -67,7 +67,7 @@ async function setupCryptoForContact(contactEmail, communicationEndpoint) {
           // 5) One‑shot initialize with BOTH the sharedSecret & theirRatchetKey
           const session = new Session(contactEmail);
           console.log("[CRYPTO] Initializing session as initiator…");
-          await session.initializeAsInitiator(sharedSecret, theirRatchetKey);
+          await session.initialize(sharedSecret, theirRatchetKey, ourEphemeral);
           await saveSession(session);
 
           console.debug('[CRYPTO] Handshake complete – session ready for', contactEmail);

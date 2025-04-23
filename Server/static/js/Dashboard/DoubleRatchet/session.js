@@ -1,6 +1,6 @@
 ﻿// Server/static/js/Dashboard/DoubleRatchet/session.js
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../../KeyStorage.js';
-
+import { saveSession } from './sessionStorage.js';
 
 /**
  * Session class for Double Ratchet protocol
@@ -31,8 +31,10 @@ class Session {
         this.initialized = false;
     }
 
+    // Use the same info string as the signal library to avoid issues on key derivation
+    HKDF_info = "WhisperRatchet"
 
-  /**
+    /**
    * Derive initial root‐and‐chain keys from the X3DH shared secret.
    * Both sides call this with the *same* sharedSecret, and get
    * the *same* RK, CKs, CKr.
@@ -44,7 +46,7 @@ class Session {
     if (!sharedSecret) {
       throw new Error("Shared secret is required");
     }
-    const info = new TextEncoder().encode("X3DH_DoubleRatchet_Init").buffer;
+    const info = new TextEncoder().encode(this.HKDF_info).buffer;
     // 96 bytes → 32 RK + 32 CKs + 32 CKr
     const derived = await window.libsignal.HKDF.deriveSecrets(
       sharedSecret,
@@ -64,34 +66,19 @@ class Session {
     return { RK, CKs, CKr };
   }
 
- /**
-   * Initiator bootstrap: just carve out keys from X3DH root.
-   * @param {ArrayBuffer} sharedSecret
-   */
-  async initializeAsInitiator(sharedSecret) {
-    if (!sharedSecret) throw new Error("Shared secret is required");
-
-    // 1) Generate our first ratchet keypair so DHs is never null
-    this.DHs = await window.libsignal.Curve.generateKeyPair();
-
-    // 2) Carve out RK, CKs, CKr from the X3DH shared secret
-    const { RK, CKs, CKr } = await this.deriveInitialRootAndChains(sharedSecret);
-    this.RK  = RK;
-    this.CKs = CKs;
-    this.CKr = CKr;
-
-    this.initialized = true;
-    return this.serialize();
-  }
-
   /**
    * Responder bootstrap: same exact carve‑out from X3DH root.
    * @param {ArrayBuffer} sharedSecret
    * @param {ArrayBuffer} theirRatchetKey – we still need their X3DH ephemeral to decrypt their first msg
+   * @param ourKeyPair {Object} – optional Curve keypair
    */
-  async initializeAsResponder(sharedSecret, theirRatchetKey) {
+  async initialize(sharedSecret, theirRatchetKey, ourKeyPair = null) {
+    if (!sharedSecret) throw new Error("Shared secret is required");
+    if (!theirRatchetKey) throw new Error("Their ratchet key is required");
     this.DHr = theirRatchetKey;   // so on first decrypt we can do the ratchet
-    this.DHs = await window.libsignal.Curve.generateKeyPair();
+
+    // Use provided key pair or generate a new one
+    this.DHs = ourKeyPair || await window.libsignal.Curve.generateKeyPair();
 
     const { RK, CKs, CKr } = await this.deriveInitialRootAndChains(sharedSecret);
     this.RK  = RK;
@@ -110,6 +97,7 @@ class Session {
             throw new Error('Cannot perform ratchet step: No remote ratchet key');
         }
 
+        console.warn('[SESSION] doing a ratchet step')
         // DH Ratchet - create new ratchet key pair
         this.DHs = await window.libsignal.Curve.generateKeyPair();
 
@@ -124,7 +112,7 @@ class Session {
         const rootKeyBuffer = new Uint8Array(this.RK);
 
         // IMPORTANT FIX: Make sure to properly await the HKDF.deriveSecrets promise
-        const info = new TextEncoder().encode("derived_keys").buffer;
+        const info = new TextEncoder().encode(this.HKDF_info).buffer;
         const derivedKeys = await window.libsignal.HKDF.deriveSecrets(
           sharedSecretBuffer.buffer,
           rootKeyBuffer.buffer,
@@ -142,18 +130,17 @@ class Session {
 
 
         // Extract the three keys from the derived secrets
-        // IMPORTANT FIX: Handle the keys properly based on how your library returns them
-        if (Array.isArray(derivedKeys)) {
-            // If it's returning an array of keys
-            this.RK = derivedKeys[0];
-            this.CKs = derivedKeys[1];
-            this.CKr = derivedKeys[2];
+        if (Array.isArray(derivedKeys) && derivedKeys.length >= 3) {
+          this.RK = derivedKeys[0];
+          this.CKs = derivedKeys[1];
+          this.CKr = derivedKeys[2];
+        } else if (derivedKeys instanceof ArrayBuffer) {
+          const buf = new Uint8Array(derivedKeys);
+          this.RK = buf.slice(0, 32).buffer;
+          this.CKs = buf.slice(32, 64).buffer;
+          this.CKr = buf.slice(64, 96).buffer;
         } else {
-            // If it's returning a single ArrayBuffer that needs to be split
-            const allKeys = new Uint8Array(derivedKeys);
-            this.RK = allKeys.slice(0, 32).buffer;
-            this.CKs = allKeys.slice(32, 64).buffer;
-            this.CKr = allKeys.slice(64, 96).buffer;
+          throw new Error('Invalid derived keys format: ' + typeof derivedKeys);
         }
 
         console.log("[Session] Derived RK:", arrayBufferToBase64(this.RK),
@@ -164,6 +151,8 @@ class Session {
         this.Ns = 0;
 
         this.debugRootKey(); // Print RK before using it
+
+        await saveSession(this);
 
         return this.serialize();
     }
@@ -215,7 +204,7 @@ class Session {
         }
     }
 
-/**
+    /**
      * Split a chain key into [nextChainKey ∥ messageKey],
      * store nextChainKey into CKs or CKr, and return messageKey.
      *
@@ -343,6 +332,7 @@ class Session {
 
         this.debugRootKey();
 
+        console.log('message:', msg);
         this.Ns++;
         return msg;
     }
@@ -353,52 +343,59 @@ class Session {
      * @returns {Promise<string>} - Decrypted plaintext
      */
     async decrypt(encryptedMessage) {
-      if (!this.initialized) {
-        throw new Error("Session not initialized");
-      }
+        try {
+            if (!this.initialized) {
+                throw new Error("Session not initialized");
+            }
 
-      const { header, ciphertext, iv, mac } = encryptedMessage;
-      const { dh, n } = header;
+            const {header, ciphertext, iv, mac} = encryptedMessage;
+            const {dh, n} = header;
 
-      // 1) Decode all the Base64 inputs
-      const theirDH        = base64ToArrayBuffer(dh);
-      const ciphertextData = base64ToArrayBuffer(ciphertext);
-      const ivData         = base64ToArrayBuffer(iv);
-      const macData        = base64ToArrayBuffer(mac);
+            // 1) Decode all the Base64 inputs
+            const theirDH = base64ToArrayBuffer(dh);
+            const ciphertextData = base64ToArrayBuffer(ciphertext);
+            const ivData = base64ToArrayBuffer(iv);
+            const macData = base64ToArrayBuffer(mac);
 
-      // 2) DH‑ratchet if this is the first incoming message or if DH changed
-      const dhChanged = !this.DHr || !this.arrayBuffersEqual(this.DHr, theirDH);
-      if (!this.CKr || dhChanged) {
-        this.DHr = theirDH;
-        await this.ratchetStep();
-        console.debug("[Session] Ran ratchet in decrypt(); CKr is now ready");
-      }
+            // 2) DH‑ratchet if this is the first incoming message or if DH changed
+            const dhChanged = !this.DHr || !this.arrayBuffersEqual(this.DHr, theirDH);
+            if (!this.CKr || dhChanged) {
+                this.DHr = theirDH;
+                await this.ratchetStep();
+                console.debug("[Session] Ran ratchet in decrypt(); CKr is now ready");
+            }
 
-      // 3) Derive (and advance) the correct message key for index n
-      const messageKey = await this.getMessageKey(n);
-      console.log("incoming MK:", arrayBufferToBase64(messageKey));
+            // 3) Derive (and advance) the correct message key for index n
+            const messageKey = await this.getMessageKey(n);
+            console.log("incoming MK:", arrayBufferToBase64(messageKey));
 
-      // 4) (Optional) Verify HMAC before decryption
-      //    You can import `messageKey` as HMAC key and do subtle.verify(...)
-      //    If it fails, throw early.
+            // 4) (Optional) Verify HMAC before decryption
+            //    You can import `messageKey` as HMAC key and do subtle.verify(...)
+            //    If it fails, throw early.
 
-      // 5) AES‑GCM decrypt
-      const aesKey = await crypto.subtle.importKey(
-        "raw", messageKey,
-        { name: "AES-GCM" },
-        false, ["decrypt"]
-      );
+            console.log('message:', encryptedMessage);
 
-      const decryptedBuffer = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: ivData },
-        aesKey,
-        ciphertextData
-      );
+            // 5) AES‑GCM decrypt
+            const aesKey = await crypto.subtle.importKey(
+                "raw", messageKey,
+                {name: "AES-GCM"},
+                false, ["decrypt"]
+            );
 
-      this.debugRootKey(); // for debugging
+            const decryptedBuffer = await crypto.subtle.decrypt(
+                {name: "AES-GCM", iv: ivData},
+                aesKey,
+                ciphertextData
+            );
 
-      // 6) Return UTF‑8 plaintext
-      return new TextDecoder().decode(decryptedBuffer);
+            this.debugRootKey(); // for debugging
+
+            // 6) Return UTF‑8 plaintext
+            return new TextDecoder().decode(decryptedBuffer);
+        } catch (e) {
+            console.log("[SESSION] Error in decrypt:", e);
+            throw new Error("[SESSION] Decryption failed: " + e.message);
+        }
     }
 
 

@@ -77,7 +77,7 @@ function setupConnectionEvents() {
 
     // one-shot responder init
     const session = new Session(from);
-    await session.initializeAsResponder(sharedSecret, theirRatchetKey);
+    await session.initialize(sharedSecret, theirRatchetKey);
     await deletePreKey(prekey_id);
     await saveSession(session);
 
